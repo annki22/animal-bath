@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v4.9.10</title>
-<!-- v4.9.10：后期 1、2 掉落占比压到各 2%（安琪定）——1 从开局 11%、2 从开局 25% 随进度线性收敛到 2%，与 7-10 同一套锚定法（权重=p·s36/(1-Σp)，任何进度占比精确） -->
+  <title>动物泡澡 · 手搓版 v4.9.11</title>
+  <!-- v4.9.11：①大数字不再坑人——7-10 只在棋盘已有该值时才会掉（安琪拍板 B，Threes 式跟随棋盘）：首个 7 只能靠合成（6+6 或 5+5+5），合出后才会出现在掉落里；棋盘没有该值时概率自然分给 3-6，掉下来的大数字永远有配对，不再是死块；原"每 25 投解锁一档"节奏删除（顺带消除 100/125 进度不一致）②落子节奏统一 260ms——落子动画 0.34s→0.26s、合成开始 230→260，方块落稳即合成，不再没落稳就闪（安琪拍板 A） -->
 <!-- v4.9.9：7-10 掉落概率改精确递减 7→4%、8→3%、9→2%、10→1%（安琪定）——高段权重锚定 1-6 权重和：w=p·S/(1-Σp)，任何解锁进度下占比精确等于目标；推翻 v4.9.4 固定 0.23 平台（只有后期才约 4%） -->
 <!-- v4.9.8：推翻 v4.9.7 横向铺满（列被拉散体验差）——五列保持紧挨（列距=行距），浴缸宽度收窄到刚好包住五列，两边留白删掉；宽度改从父容器取，防 board 显式宽度反馈收缩 -->
 <!-- v4.9.6：①起名查重（scores+saves 两表 ilike 查，重名拒绝，防冒名/占名；未锁定设备才查，查询失败放行不挡进游戏）②实时上榜——每步落定随云存档节奏（3s 防抖）同步，但仅当本局分 > 榜上该昵称历史最高时才写库（liveBest 缓存挡住常规步，未破纪录零写请求；PATCH 定位最高行同行刷新，不堆重复行）③落地音：落子音从"投放瞬间"移到"落定时刻"，低频 sine 闷响与合成上行琶音明确区分，无合成也响 ④busy 期间点击直接无效（推翻 v4.9 queuedCol 排队补投——玩家反馈动画结束自动投出非预期） -->
@@ -152,7 +152,7 @@
       0 0 6px rgba(0,0,0,.35);
     pointer-events: none;
   }
-  .tile.fall { animation: fallIn .34s cubic-bezier(.22,.9,.3,1); }
+  .tile.fall { animation: fallIn .26s cubic-bezier(.22,.9,.3,1); }   /* v4.9.11: 0.34s→0.26s，与落定/合成等待统一 260ms——方块落稳即合成，不再没落稳就闪 */
   @keyframes fallIn {
     0% { transform: translateY(-150px) scale(.9); opacity: .4; }
     70% { transform: translateY(0) scale(1.12, .88); opacity: 1; }
@@ -355,7 +355,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9.10</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9.11</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -400,7 +400,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v4.9.10 · 五列 · 越线才结束 · 掉落至 10</div>
+      <div class="ver" id="verLink" title="查看更新说明">v4.9.11 · 五列 · 越线才结束 · 大数字有配对才掉</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <div class="name-err" id="nameErr" style="display:none"></div>
@@ -526,47 +526,62 @@ const EMOJI_IMGS = [
   }
 
   // 新动物生成：从小到大，大数字主要靠合成
-  //  · 掉落上限随投放次数放开：开局允许 5，每 25 投解锁一档，125 投后到 10（v4.9.3，原上限 6）
-  //  · 7-10 是后期稀有档：解锁后概率精确 4%/3%/2%/1%（v4.9.9 锚定法）；1、2 后期各压到 2%（v4.9.10）
+  //  · 开局掉 1-5，重心 3.4（v4.2）；25 投后 6 常驻；权重重心随进度 3.4→4.2，1 级低频（原游戏实测 1 占比仅 ~11%）
+  //  · 7-10 是稀有档：概率精确 4%/3%/2%/1%（v4.9.9 锚定法），但只在棋盘已有该值时才掉（v4.9.11，安琪拍板）——
+  //    首个 7 只能靠合成（6+6 或 5+5+5），合出后才会出现在掉落里；没配对的大数字永远不会掉下来占死格
+  //  · 1、2 后期各压到 2%（v4.9.10）
   //  · 11 级以上永远不会直接掉落，只能靠合成
-  //  · 权重重心 3.4→4.2，1 级低频（原游戏实测 1 占比仅 ~11%）
   let dropCount = 0;         // 已投放次数（难度进度）
 
   function rollLevel(){
     // v4.2 掉落节奏：对齐原游戏《动物泳场》实测（2026-08-18 视频 265s 分析）
     //  · 原游戏开局就直接掉 4/5（前 80s 分布：1:11% 2:20% 3:24% 4:31% 5:13%），
     //    旧版开局只掉 1-3 且 1 占 ~47%，玩家反馈"1 太多、玩很久不见大数字"。
-    //  · 新节奏：开局允许 5，30 投后出 6；重心 3.4 → 4.2，1 级不再是主力。
-    const maxDrop = Math.min(10, 5 + Math.floor(dropCount / 25));   // v4.9.3: 上限 6→10，每 25 投解锁一档
+    //  · 新节奏：开局允许 5；重心 3.4 → 4.2，1 级不再是主力。
     const d = Math.min(1, dropCount / 100);   // 进度 0→1（100 投到顶）
     const center = 3.4 + d * 0.8;             // 重心 3.4 → 4.2
     const sigma = 1.15 + d * 0.3;             // 后期分布略宽
     // v4.9.9: 7-10 概率安琪定为精确递减——7→4%、8→3%、9→2%、10→1%（推翻 v4.9.4 固定 0.23 平台——只有后期才约 4%）
     // v4.9.10: 1、2 占比也锚定——开局约 11%/25%（对齐原游戏实测），随进度收敛，后期各压到 2%（安琪定：后期小数字要少）
+    // v4.9.11: 7-10 只在棋盘已有该值时才能掉（安琪拍板 B，Threes 式跟随棋盘）——棋盘没有 7 时
+    //          7 的 4% 不掉落、概率自然分给 3-6，掉下来的大数字永远有配对，不再是死块；
+    //          首个 7 只能靠合成（6+6 或 5+5+5），合出后才会出现在掉落里。
+    //          7-10 原"每 25 投解锁一档"节奏删除（改为棋盘跟随，顺带消除 100/125 进度不一致）；
+    //          6 仍按 v4.2 节奏：开局 25 投内只掉 1-5，之后 6 常驻。
     // 锚定法统一：被锚定档权重 = p·s36/(1-Σp)，s36=3-6 权重和，任何进度下被锚档占比精确等于目标
     const HI_P = [0, 0, 0, 0, 0, 0, 0, 0.04, 0.03, 0.02, 0.01];   // 下标=等级
-    let pSum = 0;
-    for (let i = 7; i <= maxDrop; i++) pSum += HI_P[i];
     const p1T = 0.11 + (0.02 - 0.11) * d;   // v4.9.10: 11% → 2%
     const p2T = 0.25 + (0.02 - 0.25) * d;   // v4.9.10: 25% → 2%
-    const w = [0, 0];   // 1、2 权重走锚定，先占位
+    const w = [0, 0];   // 1、2 权重占位（乘 anchor 后精确占比）
+    const lv = [1, 2];  // 权重对应等级（7-10 可能跳过，不能用下标反推等级）
+    const maxMid = dropCount >= 25 ? 6 : 5;   // v4.2 节奏：开局 25 投内只掉 1-5，之后 6 常驻（v4.9.11 保留）
     let s36 = 0;
-    for (let i = 3; i <= Math.min(maxDrop, 6); i++){
+    for (let i = 3; i <= maxMid; i++){
       const dist = Math.abs(i - center);
       let weight = Math.exp(-(dist * dist) / (2 * sigma * sigma));
       if (i === 3) weight += 0.45;   // 保底：3 保持一定频率（合成的基础，保证游戏可持续）
-      w.push(Math.max(weight, 0.05));   // v4.9.3: 兜底 0.2→0.05
-      s36 += w[w.length - 1];
+      weight = Math.max(weight, 0.05);   // v4.9.3: 兜底 0.2→0.05
+      w.push(weight); lv.push(i);
+      s36 += weight;
+    }
+    let pSum = 0;
+    for (let i = 7; i <= 10; i++){
+      if (stacks.some(col => col.includes(i))) pSum += HI_P[i];   // v4.9.11: 只锚定棋盘已有的档
     }
     const anchor = s36 / (1 - p1T - p2T - pSum);
     w[0] = p1T * anchor;
     w[1] = p2T * anchor;
-    for (let i = 7; i <= maxDrop; i++) w.push(HI_P[i] * anchor);   // v4.9.9: 精确占比
+    for (let i = 7; i <= 10; i++){
+      if (stacks.some(col => col.includes(i))){   // v4.9.11: 棋盘已有该值才加入掉落
+        w.push(HI_P[i] * anchor);
+        lv.push(i);
+      }
+    }
     const total = w.reduce((a,b)=>a+b, 0);
     let r = Math.random() * total;
     for (let i = 0; i < w.length; i++){
       r -= w[i];
-      if (r <= 0) return i + 1;
+      if (r <= 0) return lv[i];
     }
     return 1;
   }
@@ -804,7 +819,7 @@ const EMOJI_IMGS = [
         checkGameOver();
         if (running) saveGame();   // 每步落定后存档（续玩用）
       }
-    }, 230);
+    }, 260);   // v4.9.11: 230→260，与落子动画时长对齐——方块落稳才开始合成，节奏不飘
   }
 
   // ===== 自动合成（分步动画版） =====
@@ -1340,6 +1355,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v4.9.11', '大数字不再坑人：7-10 只在棋盘已有配对时才掉落（合出过 7 才会掉 7），没有配对的大数字不会再掉下来占格子；落子更利落：方块落稳即合成，节奏更顺'],
     ['v4.9.10', '后期小数字变少：1 和 2 的掉落占比随进度压到各 2%（开局约 11%/25%）'],
     ['v4.9.9', '7-10 掉落概率精确递减：7→4%、8→3%、9→2%、10→1%'],
     ['v4.9.8', '浴缸收窄：五列保持紧挨，删掉两边多余留白（推翻 v4.9.7 拉散列的铺满）'],
