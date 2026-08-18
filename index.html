@@ -215,12 +215,14 @@
 
   /* ===== 底部 ===== */
   .bottombar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 18px 14px;
+    display: flex; flex-direction: column; align-items: stretch;
+    gap: 8px; padding: 10px 18px 14px;
   }
+  .bottombar .bar2 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .bottombar .btn-row { display: flex; gap: 8px; flex-shrink: 0; }
   .hint { font-size: 11px; color: #9AA0A8; line-height: 1.5; }
   .hint b { color: #7FB6C4; }
-  .combo { font-size: 13px; font-weight: 700; color: #FF7B93; min-height: 18px; letter-spacing: 1px; }
+  .combo { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; color: #FF7B93; min-height: 18px; letter-spacing: 1px; }
   /* 连消 5+ 的庆祝提示：弹入 → 停留 → 自动淡出（总时长 1.6s，不阻塞游戏） */
   #celebration {
     position: absolute; top: 42%; left: 50%;
@@ -242,8 +244,9 @@
   .btn {
     border: none; cursor: pointer;
     font-size: 13px; font-weight: 700; letter-spacing: 1px;
-    padding: 10px 18px; border-radius: 14px;
+    padding: 9px 14px; border-radius: 14px;
     background: #2F3542; color: #fff;
+    white-space: nowrap; flex-shrink: 0;
     transition: transform .12s, opacity .2s;
   }
   .btn:active { transform: scale(.94); }
@@ -352,11 +355,14 @@
   </div>
 
   <div class="bottombar">
-    <div class="hint">点<b>列</b>投放，相同动物<b>自动合成</b><br><span class="combo" id="combo"></span></div>
-    <div style="display:flex; gap:8px;">
-      <button class="btn restart mute-btn" id="muteBtn" title="静音">🔊</button>
-      <button class="btn restart" id="rankBtn">🏆 排行</button>
-      <button class="btn restart" id="restartBtn">重新开始</button>
+    <div class="hint">点<b>列</b>投放，相同动物<b>自动合成</b></div>
+    <div class="bar2">
+      <span class="combo" id="combo"></span>
+      <div class="btn-row">
+        <button class="btn restart mute-btn" id="muteBtn" title="静音">🔊</button>
+        <button class="btn restart" id="rankBtn">🏆 排行</button>
+        <button class="btn restart" id="restartBtn">重新开始</button>
+      </div>
     </div>
   </div>
 
@@ -558,10 +564,12 @@ const EMOJI_IMGS = [
   }
 
   // ===== BGM（Web Audio 程序化合成，无外部文件，单文件自包含） =====
-  // C 大调五声音阶轻快旋律（BPM≈150，每音 0.4s，16 步 6.4s 循环）
+  // C 大调 I-V-vi-IV 琶音上行回落（do-mi-sol-mi 卡通风，BPM≈176，每音 0.34s）
   // 低音 I-V-vi-IV（C G A F）每 4 步一个，与旋律 16 步完美对齐
-  const BGM_MELODY = [523.25, 659.25, 783.99, 880.00, 783.99, 659.25, 587.33, 523.25,
-                      440.00, 523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 440.00];
+  const BGM_MELODY = [523.25, 659.25, 783.99, 659.25,
+                      392.00, 493.88, 587.33, 493.88,
+                      440.00, 523.25, 659.25, 523.25,
+                      349.23, 440.00, 523.25, 440.00];
   const BGM_BASS   = [130.81, 196.00, 220.00, 174.61];
   let bgmTimer = null, bgmStep = 0;
   function playTone(freq, when, dur, type, vol){
@@ -584,7 +592,7 @@ const EMOJI_IMGS = [
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') actx.resume();
       bgmStep = 0;
-      bgmTimer = setInterval(bgmTick, 400);
+      bgmTimer = setInterval(bgmTick, 340);
     } catch(e){}
   }
   function stopBGM(){
@@ -593,8 +601,8 @@ const EMOJI_IMGS = [
   function bgmTick(){
     if (!actx || actx.state === 'suspended') return;
     const i = bgmStep % BGM_MELODY.length;
-    playTone(BGM_MELODY[i], 0, 0.34, 'triangle', 0.085);
-    if (bgmStep % 4 === 0) playTone(BGM_BASS[(bgmStep / 4) % BGM_BASS.length | 0], 0, 0.38, 'sine', 0.095);
+    playTone(BGM_MELODY[i], 0, 0.28, 'triangle', 0.09);
+    if (bgmStep % 4 === 0) playTone(BGM_BASS[(bgmStep / 4) % BGM_BASS.length | 0], 0, 0.3, 'sine', 0.075);
     bgmStep++;
   }
 
