@@ -243,6 +243,7 @@
   }
   .btn:active { transform: scale(.94); }
   .btn.restart { background: #E8E6E0; color: #6B7280; }
+  .btn.mute-btn { width: 48px; padding: 13px 0; text-align: center; font-size: 16px; flex: none; }
 
   /* ===== 特效层 ===== */
   .fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 20; overflow: hidden; }
@@ -348,6 +349,7 @@
   <div class="bottombar">
     <div class="hint">点<b>列</b>投放，相同动物<b>自动合成</b><br><span class="combo" id="combo"></span></div>
     <div style="display:flex; gap:8px;">
+      <button class="btn restart mute-btn" id="muteBtn" title="静音">🔊</button>
       <button class="btn restart" id="rankBtn">🏆 排行</button>
       <button class="btn restart" id="restartBtn">重新开始</button>
     </div>
@@ -476,7 +478,10 @@
 
   // ===== 音效（Web Audio 轻量合成） =====
   let actx = null;
+  let muted = false;   // 全局静音：音效 + BGM 一起关（localStorage 持久化）
+  try { muted = localStorage.getItem('animalBathMuted') === '1'; } catch (e) {}
   function beep(freq, dur, type, vol, when){
+    if (muted) return;
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       if (actx.state === 'suspended') actx.resume();
@@ -491,6 +496,57 @@
       o.connect(g); g.connect(actx.destination);
       o.start(t); o.stop(t + (dur || 0.1) + 0.03);
     } catch(e){}
+  }
+
+  // 合成成功专属音效：快速上行琶音（根音→大三度→纯五度），等级越高越亮
+  // 单音 sine 太弱没辨识度，三连音才有"升级成功"的满足感
+  function mergeSound(nl){
+    if (muted) return;
+    const base = 360 + nl * 42;
+    beep(base, 0.09, 'square', 0.07);
+    beep(base * 1.26, 0.10, 'triangle', 0.10, 0.06);
+    beep(base * 1.5, 0.16, 'sine', 0.12, 0.13);
+  }
+
+  // ===== BGM（Web Audio 程序化合成，无外部文件，单文件自包含） =====
+  // C 大调五声音阶轻快旋律（BPM≈150，每音 0.4s，16 步 6.4s 循环）
+  // 低音 I-V-vi-IV（C G A F）每 4 步一个，与旋律 16 步完美对齐
+  const BGM_MELODY = [523.25, 659.25, 783.99, 880.00, 783.99, 659.25, 587.33, 523.25,
+                      440.00, 523.25, 659.25, 783.99, 659.25, 587.33, 523.25, 440.00];
+  const BGM_BASS   = [130.81, 196.00, 220.00, 174.61];
+  let bgmTimer = null, bgmStep = 0;
+  function playTone(freq, when, dur, type, vol){
+    try {
+      if (!actx) return;
+      const t = actx.currentTime + when;
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t + dur + 0.05);
+    } catch(e){}
+  }
+  function startBGM(){
+    if (muted || bgmTimer) return;
+    try {
+      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      bgmStep = 0;
+      bgmTimer = setInterval(bgmTick, 400);
+    } catch(e){}
+  }
+  function stopBGM(){
+    if (bgmTimer){ clearInterval(bgmTimer); bgmTimer = null; }
+  }
+  function bgmTick(){
+    if (!actx || actx.state === 'suspended') return;
+    const i = bgmStep % BGM_MELODY.length;
+    playTone(BGM_MELODY[i], 0, 0.34, 'triangle', 0.085);
+    if (bgmStep % 4 === 0) playTone(BGM_BASS[(bgmStep / 4) % BGM_BASS.length | 0], 0, 0.38, 'sine', 0.095);
+    bgmStep++;
   }
 
   // ===== 状态 =====
@@ -648,6 +704,7 @@
   function drop(colIdx){
     if (!running || busy) return;
     busy = true;
+    if (!bgmTimer && !muted) startBGM();   // 兜底：任何投放手势都可启动 BGM（浏览器自动播放策略）
     dropCount++;
     const level = nextQueue.shift();
     nextQueue.push(rollLevel());
@@ -805,7 +862,8 @@
         el.classList.add('merge-pop');
         setTimeout(() => el.classList.remove('merge-pop'), 500);
       }
-      beep(420 + nl * 45, 0.12, 'sine', 0.13);
+      // 合成成功：等级越高音越亮，快速上行琶音（更有满足感）
+      mergeSound(nl);
       await sleep(320);
     }
     if (chains === 0) return;
@@ -942,6 +1000,7 @@
     clearSave();
     init();
     hideNameOverlay();
+    startBGM();   // 用户手势内启动背景音乐
   }
 
   // 结算：提交分数到排行榜（同名已有更高分则跳过）。返回是否成功
@@ -1098,6 +1157,20 @@
   document.getElementById('restartBtn').addEventListener('click', startNewGame);
   document.getElementById('againBtn').addEventListener('click', startNewGame);
   document.getElementById('rankBtn').addEventListener('click', showRank);
+  const muteBtn = document.getElementById('muteBtn');
+  muteBtn.textContent = muted ? '🔇' : '🔊';
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    try { localStorage.setItem('animalBathMuted', muted ? '1' : '0'); } catch (e) {}
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    if (muted) stopBGM(); else startBGM();
+    if (!muted) beep(880, 0.08, 'sine', 0.1);   // 开启时给个反馈音
+  });
+  // 页面隐藏时暂停 BGM（切后台不吵 + 省电），回到页面自动恢复
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopBGM();
+    else if (!muted) startBGM();
+  });
   document.getElementById('rankClose').addEventListener('click', () => rankOverlay.classList.remove('show'));
   document.getElementById('endRankBtn').addEventListener('click', () => { overlay.classList.remove('show'); showRank(); });
   document.getElementById('whoBtn').addEventListener('click', showNameOverlay);
