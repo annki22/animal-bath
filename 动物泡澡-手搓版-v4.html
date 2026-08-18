@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版</title>
-<!-- v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
+<title>动物泡澡 · 手搓版 v4.6</title>
+<!-- v4.6：底部按钮两行布局修复 + 更欢乐 BGM（I-V-vi-IV 琶音卡通风）；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -29,6 +29,8 @@
   }
   .title { font-size: 20px; font-weight: 800; letter-spacing: 1px; color: #2F3542; }
   .title small { display: block; font-size: 11px; font-weight: 500; color: #9AA0A8; letter-spacing: 2px; margin-top: 2px; }
+  .title small em { font-style: normal; color: #FF7B93; font-weight: 700; }
+  .ver { font-size: 10px; color: #B8BEC6; letter-spacing: 1px; margin-top: 6px; }
   .scorebox { text-align: right; }
   .score-label { font-size: 10px; color: #9AA0A8; letter-spacing: 1px; }
   .score { font-size: 26px; font-weight: 800; color: #2F3542; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -328,7 +330,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版</small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.6</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -385,6 +387,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
+      <div class="ver">v4.6 · 按钮修复 · 新BGM</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
