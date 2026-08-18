@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.9</title>
+  <title>动物泡澡 · 手搓版 v4.9.2</title>
+<!-- v4.9.2：五列棋盘（COLS 6→5 + colsBg/cols 两处 grid 同步）；警戒线上方固定留 1 行投放缓冲（fitBoard 高度预算按 7 行算：线下 6 行堆叠 + 线上 1 行，矮屏线不再贴顶，第 7 层越线方块也看得见） -->
+<!-- v4.9.1：紧急热修——①警戒线下固定 6 行（所有设备一致，电脑大屏不再自适应出很多行/警戒线上移）②触碰警戒线不死（堆满 6 层顶部贴线仍安全），超过才结束（第 7 层越线触发），推翻 v4.8 的"触达即死" -->
 <!-- v4.9：健壮性批次——①昵称框打数字不再穿透投放（键盘事件检查输入焦点/弹窗）②合成动画中点重新开始不再污染新棋盘（局号 gen 机制，旧局异步连锁/结算全部作废）③修复 CSS 误用 // 注释吞掉 pointer-events ④游戏结束立即清存档（防死后强退"复活"）⑤清理死代码：旧结算弹窗、MAX_ROWS、重复 keyframes、combo 变量 ⑥合成动画期间连点不再被吞（记最后一次点击，落定自动补投）⑦存档加 maxLevel（续玩不断最大合成纪录）⑧本地存档绑昵称（同设备换号不读别人存档） -->
 <!-- v4.8.4：修复游戏中点排行榜关闭后棋盘被清空（addEventListener 直接传 showRank，MouseEvent 被当成 fromGame 参数导致误开新局）；v4.8.3：破纪录时新行继承历史最大合成——最大分值与最大合成数各自保持历史最佳；v4.8.2：max_level 每局就地更新（不等破纪录）+ 排行榜最大合成列去"合"字；v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
@@ -82,7 +84,7 @@
   }
   .cols-bg {
     position: absolute; inset: 0;
-    display: grid; grid-template-columns: repeat(6, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     padding: 4px;
   }
   .col-bg {
@@ -193,7 +195,7 @@
   /* 列（点击层） */
   .cols {
     position: absolute; inset: 0;
-    display: grid; grid-template-columns: repeat(6, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     z-index: 5;
   }
   .col {
@@ -333,7 +335,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9.2</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -360,7 +362,7 @@
   </div>
 
   <div class="bottombar">
-    <div class="hint">点<b>列</b>投放（或按 <b>1-6</b>），相同动物<b>自动合成</b></div>
+    <div class="hint">点<b>列</b>投放（或按 <b>1-5</b>），相同动物<b>自动合成</b></div>
     <div class="bar2">
       <span class="combo" id="combo"></span>
       <div class="btn-row">
@@ -377,7 +379,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.9 · 六列 · 警戒线结束 · 皇冠排行</div>
+      <div class="ver">v4.9.2 · 五列 · 越线才结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -402,10 +404,10 @@
   'use strict';
 
   // ===== 配置 =====
-  const COLS = 6;
+  const COLS = 5;
   // v4.3: 合成无上限（11+11 → 12 → 13 …一直往上，2026-08-18 用户要求"不要卡在11"）
   // 等级超过 40 时动物回退 🐾、颜色用 HSL 自动生成（见 getAnimal/getGrad）
-  let overRow = 12;          // 当前实际警戒层数（fitBoard 按屏幕高度自适应；标准手机屏≈6 行，警戒线下就是可堆叠区）
+  const ROWS = 6;            // v4.9.1: 警戒线下固定 6 行——所有设备一致，不再按屏高自适应
 
   // ===== 云端（Supabase 免费版，排行榜 & 跨设备续玩） =====
   const SUPABASE_URL = 'https://prlngioyqqonxerssprb.supabase.co';
@@ -652,16 +654,17 @@ const EMOJI_IMGS = [
     const boardW = board.clientWidth;
     if (!boardH || !boardW) return;
     const gap = 2;
-    // 紧凑大格子：方块尺寸 = 列宽（列与列之间几乎无空隙，像原版）
-    const tile = Math.max(34, Math.floor((boardW - 10) / COLS) - 2);
-    // 层数：能堆几层堆几层（原版就是 4-6 层的大格子棋盘）
-    const avail = boardH - 14;
-    overRow = Math.max(3, Math.floor(avail / (tile + gap)));
+    // v4.9.1: 固定 6 行堆叠区——方块尺寸取"列宽"与"6 行恰好放下"的较小者，
+    // 大屏不再出现警戒线上移/行数变多（电脑、手机一致 6 行）；矮屏自动缩小方块保证 6 行放得下
+    const byWidth = Math.max(34, Math.floor((boardW - 10) / COLS) - 2);
+    // v4.9.2: 高度预算按 7 行算（线下 6 行堆叠 + 线上 1 行投放缓冲）——警戒线上方始终留出一行空间
+    const byHeight = Math.max(24, Math.floor((boardH - 14 - ROWS * gap) / (ROWS + 1)));
+    const tile = Math.min(byWidth, byHeight);
     rootStyle.setProperty('--tile', tile + 'px');
     rootStyle.setProperty('--gap', gap + 'px');
     rootStyle.setProperty('--tile-font', Math.round(tile * 0.5) + 'px');
-    // 警戒线 = 第 overRow 层的顶部（始终贴近堆叠上限）
-    const top = Math.max(6, boardH - 7 - overRow * (tile + gap));
+    // 警戒线 = 第 6 行顶部（堆满 6 层顶部贴线=触碰，不死；第 7 层越线=结束）
+    const top = Math.max(6, boardH - 7 - ROWS * (tile + gap));
     dangerLine.style.top = top + 'px';
     dangerTag.style.top = (top - 12) + 'px';
   }
@@ -923,7 +926,7 @@ const EMOJI_IMGS = [
     const myGen = gen;   // v4.9: 记录局号——等待提交期间开了新局，就不再弹结算榜
     let over = false;
     for (let c = 0; c < COLS; c++){
-      if (stacks[c].length >= overRow) { over = true; break; }   // v4.8: 触达警戒线直接结束（不再等越过一格）
+      if (stacks[c].length > ROWS) { over = true; break; }   // v4.9.1: 超过警戒线才结束——堆满 6 层贴线=触碰不死，第 7 层越线才触发
     }
     if (over){
       running = false;
@@ -1206,10 +1209,10 @@ const EMOJI_IMGS = [
     const col = e.target.closest('.col');
     if (col) drop(parseInt(col.dataset.col, 10));
   });
-  // 键盘 1-6 投放
+  // 键盘 1-5 投放
   // v4.9: 昵称框聚焦（打数字会穿透投放）或任何弹窗打开时，键盘不触发投放
   document.addEventListener('keydown', (e) => {
-    if (!/^[1-6]$/.test(e.key)) return;
+    if (!/^[1-5]$/.test(e.key)) return;
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if (nameOverlay.classList.contains('show') || rankOverlay.classList.contains('show')) return;
     drop(parseInt(e.key, 10) - 1);
