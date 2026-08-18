@@ -216,6 +216,24 @@
   .hint { font-size: 11px; color: #9AA0A8; line-height: 1.5; }
   .hint b { color: #7FB6C4; }
   .combo { font-size: 13px; font-weight: 700; color: #FF7B93; min-height: 18px; letter-spacing: 1px; }
+  /* 连消 5+ 的庆祝提示：弹入 → 停留 → 自动淡出（总时长 1.6s，不阻塞游戏） */
+  #celebration {
+    position: absolute; top: 42%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 34px; font-weight: 800; letter-spacing: 2px;
+    color: #FF8A3D;
+    text-shadow: 0 2px 14px rgba(255, 138, 61, .45);
+    white-space: nowrap; pointer-events: none; z-index: 30;
+    opacity: 0;
+  }
+  #celebration.show { animation: celebPop 1.6s ease forwards; }
+  @keyframes celebPop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+    15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+    30%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    72%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.06); }
+  }
   .btn {
     border: none; cursor: pointer;
     font-size: 13px; font-weight: 700; letter-spacing: 1px;
@@ -323,6 +341,7 @@
       <div class="danger-tag" id="dangerTag">警戒线</div>
       <div class="cols" id="cols"></div>
       <div class="fx-layer" id="fx"></div>
+      <div id="celebration"></div>
     </div>
   </div>
 
@@ -378,7 +397,8 @@
 
   // ===== 配置 =====
   const COLS = 5;
-  const MAX_LEVEL = 11;
+  // v4.3: 合成无上限（11+11 → 12 → 13 …一直往上，2026-08-18 用户要求"不要卡在11"）
+  // 等级超过 40 时动物回退 🐾、颜色用 HSL 自动生成（见 getAnimal/getGrad）
   const MAX_ROWS = 12;       // 最多堆 12 层（窗口够高时）
   let overRow = 12;          // 当前实际警戒层数（fitBoard 自适应）
 
@@ -389,8 +409,10 @@
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
 
-  // 动物表：1-11 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
-  const ANIMALS = ['🐶','🐷','🐸','🐻','🐘','🐑','🐯','🦊','🐨','🐢','🦉'];
+  // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
+  // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
+  const ANIMALS = ['🐶','🐷','🐸','🐻','🐘','🐑','🐯','🦊','🐨','🐢','🦉','🦁','🐲','🦖','🐳',
+    '🦄','🐺','🐱','🐼','🦍','🦓','🐴','🦒','🦛','🐹','🐰','🦝','🦫','🦨','🦡','🦔','🐿','🦇','🐧','🦆','🦅','🦜','🦚','🦢','🦩'];
   const GRADS = [
     'linear-gradient(160deg,#FFEFB0,#FFD75E 55%,#F0B62E)',   // 1 黄
     'linear-gradient(160deg,#FFD8E3,#FFB3C7 55%,#F58BA6)',   // 2 粉
@@ -402,12 +424,25 @@
     'linear-gradient(160deg,#FFB2A6,#FF8A7A 55%,#F0675A)',   // 8 红
     'linear-gradient(160deg,#D6D1E0,#B9B2C7 55%,#9992A8)',   // 9 灰
     'linear-gradient(160deg,#A5EAC6,#7ED6A5 55%,#5BBE87)',   // 10 翠
-    'linear-gradient(160deg,#DECAF8,#C3A6F2 55%,#A687DC)'    // 11 紫
+    'linear-gradient(160deg,#DECAF8,#C3A6F2 55%,#A687DC)',   // 11 紫
+    'linear-gradient(160deg,#FFF3B8,#FFD700 55%,#DAA520)',   // 12 金
+    'linear-gradient(160deg,#C9F5E5,#7FE0BE 55%,#4CB894)',   // 13 青
+    'linear-gradient(160deg,#C5D9FF,#8FB3FF 55%,#5C7CE6)',   // 14 深蓝
+    'linear-gradient(160deg,#FFC9E8,#FF8FD0 55%,#E85BA8)'    // 15 玫红
   ];
+  // 超过渐变表的等级：HSL 色相轮转自动生成（保证一直往上合也有新颜色）
+  function getGrad(level){
+    if (level <= GRADS.length) return GRADS[level - 1];
+    const h = (level * 47) % 360;
+    return `linear-gradient(160deg,hsl(${h},82%,82%),hsl(${h},72%,68%) 55%,hsl(${h},62%,55%))`;
+  }
+  function getAnimal(level){
+    return ANIMALS[level - 1] || '🐾';
+  }
 
   // 新动物生成：从小到大，大数字只能靠合成
   //  · 掉落上限随投放次数放开：开局允许 5，30投出6（对齐原游戏节奏：开局即有 4/5 掉落）
-  //  · 7 级以上（7-11）永远不会直接掉落，只能靠合成
+  //  · 7 级以上（7-15）永远不会直接掉落，只能靠合成
   //  · 权重重心 3.4→4.2，1 级低频（原游戏实测 1 占比仅 ~11%）
   let dropCount = 0;         // 已投放次数（难度进度）
 
@@ -499,7 +534,7 @@
 
   // ===== 渲染 =====
   function tileHTML(level, extra=''){
-    return `<div class="tile ${extra}" data-level="${level}" style="background:${GRADS[level-1]}">${ANIMALS[level-1]}<span class="num">${level}</span></div>`;
+    return `<div class="tile ${extra}" data-level="${level}" style="background:${getGrad(level)}">${getAnimal(level)}<span class="num">${level}</span></div>`;
   }
 
   function render(){
@@ -580,7 +615,7 @@
     }
 
     // 浮动文字
-    const gain = Math.round(level * 15 * (1 + 0.3 * (chain - 1)));
+    const gain = Math.round(level * 15 * Math.pow(1.3, chain - 1));   // 指数加成：连消越多加得越多
     const ft = document.createElement('div');
     ft.className = 'float-text';
     ft.textContent = chain > 1 ? `连击 x${chain} · 洗浴值 +${gain}` : `洗浴值 +${gain}`;
@@ -731,34 +766,8 @@
       if (same.length === 0) continue;
       const level = stacks[c][r];
       // 吸收 k 个相同 → 跳 k 级（结果留在当前处理位置）
-      const nlRaw = level + same.length;
-      if (nlRaw > MAX_LEVEL){
-        // 满级合成（如 11+11）：参与方块全部消除，不留新方块。
-        // 旧逻辑 Math.min 截断回 11 → 两个 11 永远卡在 11（2026-08-18 用户反馈）。
-        // 消除后下方方块掉落 → 入队下移链继续连锁。
-        await flashSet(c, r, same);
-        await goneSet(same);
-        const all = [{col: c, row: r}, ...same].sort((a, b) => b.row - a.row);
-        for (const s of all) stacks[s.col].splice(s.row, 1);
-        chains++;
-        lastC = c; lastR = r;
-        score += MAX_LEVEL * 30;   // 满级消除奖励
-        updateScore();
-        render();
-        for (const s of all){
-          const col = stacks[s.col];
-          for (let rr = s.row; rr < col.length; rr++){
-            const v = col[rr];
-            if (rr > 0 && col[rr-1] === v) queue.add(s.col + ',' + rr);
-            if (s.col > 0 && stacks[s.col-1][rr] === v) queue.add(s.col + ',' + rr);
-            if (s.col < COLS - 1 && stacks[s.col+1][rr] === v) queue.add(s.col + ',' + rr);
-          }
-        }
-        beep(880, 0.18, 'square', 0.1);
-        await sleep(320);
-        continue;
-      }
-      const nl = nlRaw;
+      // v4.3: 无上限合成——11+11 → 12，一直往上（2026-08-18 用户要求"不要卡在11"）
+      const nl = level + same.length;
       // 1) 预备：所有参与方块碰撞闪烁
       await flashSet(c, r, same);
       // 2) 被吸收的方块缩小消失
@@ -807,7 +816,7 @@
     for (let c = 0; c < COLS; c++){
       for (const v of stacks[c]) topLevel = Math.max(topLevel, v);
     }
-    const gain = Math.round(topLevel * 15 * (1 + 0.3 * (chains - 1)));
+    const gain = Math.round(topLevel * 15 * Math.pow(1.3, chains - 1));   // 指数加成：1连1x 2连1.3x 3连1.69x 5连2.86x
     score += gain;
     updateScore();
 
@@ -823,6 +832,16 @@
     if (chains > 1){
       comboEl.textContent = `连击 x${chains}`;
       setTimeout(() => { comboEl.textContent = ''; }, 1300);
+    }
+
+    // 连消 5 次以上：庆祝提示（弹入 → 停留 → 1.6s 自动淡出，不阻塞游戏）
+    if (chains >= 5){
+      const el = document.getElementById('celebration');
+      const msgs = { 5: '🎉 5连击！', 6: '🔥 6连击 超棒！', 7: '⚡ 7连击 神操作！' };
+      el.textContent = msgs[chains] || `💥 ${chains}连击 逆天！`;
+      el.classList.remove('show');
+      void el.offsetWidth;   // 强制重排，重启动画
+      el.classList.add('show');
     }
   }
 
