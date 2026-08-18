@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.8.4</title>
+<title>动物泡澡 · 手搓版 v4.9</title>
+<!-- v4.9：健壮性批次——①昵称框打数字不再穿透投放（键盘事件检查输入焦点/弹窗）②合成动画中点重新开始不再污染新棋盘（局号 gen 机制，旧局异步连锁/结算全部作废）③修复 CSS 误用 // 注释吞掉 pointer-events ④游戏结束立即清存档（防死后强退"复活"）⑤清理死代码：旧结算弹窗、MAX_ROWS、重复 keyframes、combo 变量 ⑥合成动画期间连点不再被吞（记最后一次点击，落定自动补投）⑦存档加 maxLevel（续玩不断最大合成纪录）⑧本地存档绑昵称（同设备换号不读别人存档） -->
 <!-- v4.8.4：修复游戏中点排行榜关闭后棋盘被清空（addEventListener 直接传 showRank，MouseEvent 被当成 fromGame 参数导致误开新局）；v4.8.3：破纪录时新行继承历史最大合成——最大分值与最大合成数各自保持历史最佳；v4.8.2：max_level 每局就地更新（不等破纪录）+ 排行榜最大合成列去"合"字；v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -127,7 +128,7 @@
   }
   .tile .animal {
     width: 62%; height: 62%; object-fit: contain;
-    margin-bottom: 14%;           // 给底部数字让位
+    margin-bottom: 14%;           /* 给底部数字让位（v4.9 修复：曾误用 // 注释，吞掉了下面 pointer-events 一条） */
     pointer-events: none;
   }
   .tile .num {
@@ -140,12 +141,6 @@
       0 0 2px rgba(0,0,0,.65),
       0 0 6px rgba(0,0,0,.35);
     pointer-events: none;
-  }
-  .tile.highlight { animation: mergeFlash .5s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes mergeFlash {
-    0% { transform: scale(1.5) translateY(-4px); filter: brightness(1.6); }
-    60% { transform: scale(.94) translateY(1px); filter: brightness(1.15); }
-    100% { transform: scale(1) translateY(0); filter: brightness(1); }
   }
   .tile.fall { animation: fallIn .34s cubic-bezier(.22,.9,.3,1); }
   @keyframes fallIn {
@@ -307,11 +302,6 @@
   .modal .emoji { font-size: 52px; margin-bottom: 8px; }
   .modal h2 { font-size: 22px; font-weight: 800; color: #2F3542; margin-bottom: 4px; }
   .modal .sub { font-size: 13px; color: #9AA0A8; margin-bottom: 16px; }
-  .modal .score-line { font-size: 15px; color: #6B7280; margin-bottom: 4px; }
-  .modal .score-line b { font-size: 20px; color: #2F3542; }
-  .modal .newbest { font-size: 12px; color: #FF7B93; font-weight: 700; margin-bottom: 14px; }
-  .modal .submit-status { font-size: 12px; color: #34C759; font-weight: 600; margin-bottom: 12px; min-height: 16px; }
-  .modal .submit-status.fail { color: #FF7B93; }
   .modal .btn { width: 100%; padding: 13px; font-size: 15px; border-radius: 16px; }
   .btn.ghost { background: #E8E6E0; color: #6B7280; margin-top: 8px; }
 
@@ -343,7 +333,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.4</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -381,26 +371,13 @@
     </div>
   </div>
 
-  <div class="overlay" id="overlay">
-    <div class="modal">
-      <div class="emoji">🛁</div>
-      <h2 id="endTitle">游戏结束</h2>
-      <div class="sub" id="endSub">动物把浴池堆满了</div>
-      <div class="score-line">本局洗浴值 <b id="endScore">0</b></div>
-      <div class="newbest" id="newBest" style="display:none">🏆 新纪录！</div>
-      <div class="submit-status" id="endSubmit" style="display:none"></div>
-      <button class="btn" id="againBtn">再来一局</button>
-      <button class="btn ghost" id="endRankBtn">查看排行榜</button>
-    </div>
-  </div>
-
   <!-- 昵称登录 -->
   <div class="overlay show" id="nameOverlay">
     <div class="modal">
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.8.4 · 六列 · 警戒线结束 · 皇冠排行</div>
+      <div class="ver">v4.9 · 六列 · 警戒线结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -428,8 +405,7 @@
   const COLS = 6;
   // v4.3: 合成无上限（11+11 → 12 → 13 …一直往上，2026-08-18 用户要求"不要卡在11"）
   // 等级超过 40 时动物回退 🐾、颜色用 HSL 自动生成（见 getAnimal/getGrad）
-  const MAX_ROWS = 12;       // 最多堆 12 层（窗口够高时）
-  let overRow = 12;          // 当前实际警戒层数（fitBoard 自适应）
+  let overRow = 12;          // 当前实际警戒层数（fitBoard 按屏幕高度自适应；标准手机屏≈6 行，警戒线下就是可堆叠区）
 
   // ===== 云端（Supabase 免费版，排行榜 & 跨设备续玩） =====
   const SUPABASE_URL = 'https://prlngioyqqonxerssprb.supabase.co';
@@ -582,7 +558,6 @@ const EMOJI_IMGS = [
   // ===== 状态 =====
   let stacks = [];       // 每列数组（底部 -> 顶部）
   let score = 0;
-  let combo = 0;
   let best = 0;
   try { best = parseInt(localStorage.getItem('animalBathBest') || '0', 10); } catch (e) { /* file:// 下部分浏览器禁止 localStorage，忽略 */ }
   let maxLevel = 1;          // 本局最大合成数字（v4.8：排行榜展示）
@@ -590,6 +565,8 @@ const EMOJI_IMGS = [
   let nextQueue = [rollLevel(), rollLevel()];
   let running = false;
   let busy = false;      // 合成动画进行中，禁止继续投放
+  let gen = 0;           // 局号：每开新局 +1，用于丢弃上一局尚未跑完的异步连锁（v4.9 竞态修复）
+  let queuedCol = -1;    // busy 期间玩家点的最后一列，动画结束后自动补投（v4.9：连点不再被吞）
   let nickname = '';     // 当前玩家昵称
   let cloudTimer = null; // 云端存档防抖
 
@@ -602,10 +579,6 @@ const EMOJI_IMGS = [
   const comboEl = document.getElementById('combo');
   const next1El = document.getElementById('next1');
   const next2El = document.getElementById('next2');
-  const overlay = document.getElementById('overlay');
-  const endScore = document.getElementById('endScore');
-  const endSubmit = document.getElementById('endSubmit');
-  const newBestEl = document.getElementById('newBest');
   const nameOverlay = document.getElementById('nameOverlay');
   const nameInput = document.getElementById('nameInput');
   const nameStart = document.getElementById('nameStart');
@@ -740,8 +713,9 @@ const EMOJI_IMGS = [
 
   // ===== 投放（点击列） =====
   function drop(colIdx){
-    if (!running || busy) return;
-    busy = true;
+    if (!running) return;
+    if (busy){ queuedCol = colIdx; return; }   // v4.9: 动画期间连点不再被吞——记住最后一次点击，落定后自动补投
+    busy = true; queuedCol = -1;
     dropCount++;
     const level = nextQueue.shift();
     nextQueue.push(rollLevel());
@@ -761,16 +735,19 @@ const EMOJI_IMGS = [
     beep(300 + level * 30, 0.06, 'triangle', 0.07);   // 落子声（等级越高音越高）
 
     // 自动合成：相邻相同合并升级（分步动画），连锁（稍等落子动画）
+    const myGen = gen;   // v4.9: 记录局号——若连锁途中玩家点了"重新开始"，旧局的收尾全部作废
     setTimeout(async () => {
       try {
-        await settleMerge(colIdx);
+        await settleMerge(colIdx, myGen);
       } catch (e) {
         console.error('settleMerge error:', e);
         render();  // 异常时兜底：重建棋盘，避免状态错乱
       } finally {
         busy = false;  // 无论合成是否正常完成，都解锁投放，防止卡死
+        if (myGen !== gen) return;   // 局已换：checkGameOver/saveGame/补投都归新局管
         checkGameOver();
         if (running) saveGame();   // 每步落定后存档（续玩用）
+        if (queuedCol >= 0 && running){ const qc = queuedCol; queuedCol = -1; drop(qc); }   // v4.9: 补投排队的一击
       }
     }, 230);
   }
@@ -839,7 +816,7 @@ const EMOJI_IMGS = [
     });
   }
 
-  async function settleMerge(colIdx){
+  async function settleMerge(colIdx, myGen){
     let chains = 0, guard = 0;
     let lastC = -1, lastR = -1;   // 最后一次合成/消除位置（spawnFX 用）
     // 队列式连锁（2026-08-18 v4.2 修复）：
@@ -850,6 +827,7 @@ const EMOJI_IMGS = [
     const queue = new Set();
     queue.add(colIdx + ',' + (stacks[colIdx].length - 1));
     while (queue.size > 0){
+      if (myGen !== gen) return;   // v4.9: 连锁途中开了新局，旧连锁立即作废（防止旧局方块写进新棋盘）
       if (++guard > 500) break;   // 死循环保险
       const key = queue.values().next().value;
       queue.delete(key);
@@ -867,6 +845,7 @@ const EMOJI_IMGS = [
       await flashSet(c, r, same);
       // 2) 被吸收的方块缩小消失
       await goneSet(same);
+      if (myGen !== gen) return;   // v4.9: 动画等待期间开了新局，别再写新棋盘
       // 3) 应用合并：先删被吸收的（同列从高 row 往下删，避免索引错乱）
       const below = same.filter(s => s.col === c && s.row < r).length;
       const sorted = [...same].sort((a, b) => b.row - a.row);
@@ -906,7 +885,6 @@ const EMOJI_IMGS = [
     }
     if (chains === 0) return;
 
-    combo = Math.max(combo, chains);
     // 计分：取棋盘上最大等级作为本次合成的代表等级
     let topLevel = 0;
     for (let c = 0; c < COLS; c++){
@@ -942,27 +920,26 @@ const EMOJI_IMGS = [
   }
 
   async function checkGameOver(){
+    const myGen = gen;   // v4.9: 记录局号——等待提交期间开了新局，就不再弹结算榜
     let over = false;
     for (let c = 0; c < COLS; c++){
       if (stacks[c].length >= overRow) { over = true; break; }   // v4.8: 触达警戒线直接结束（不再等越过一格）
     }
     if (over){
       running = false;
+      clearSave();   // v4.9: 结束即清存档——否则死后强退再进会"复活"到临终棋盘
       if (score > best){
         best = score;
         try { localStorage.setItem('animalBathBest', String(best)); } catch (e) { /* 忽略：无法保存最高分不影响游玩 */ }
         bestEl.textContent = best.toLocaleString();
-        newBestEl.style.display = 'block';
-      } else {
-        newBestEl.style.display = 'none';
       }
-      endScore.textContent = score.toLocaleString();
       // v4.8: 结算直接弹排行榜（显示名次 + 超越多少人），关闭排行榜后自动开新局
       // 提交分数与最后的合成动画（≥500ms）并行，不额外等待
       await Promise.all([
         submitScore(),
         new Promise(r => setTimeout(r, 500))
       ]);
+      if (myGen !== gen) return;   // v4.9: 等待期间已开新局，别弹榜
       showRank(true);
     }
   }
@@ -978,7 +955,7 @@ const EMOJI_IMGS = [
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
   function saveGame(){
     if (!nickname) return;
-    const state = { stacks: stacks, score: score, combo: combo, dropCount: dropCount, nextQueue: nextQueue };
+    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
     if (cloudTimer) clearTimeout(cloudTimer);
     cloudTimer = setTimeout(() => {
@@ -1018,8 +995,8 @@ const EMOJI_IMGS = [
     if (!state || !Array.isArray(state.stacks) || state.stacks.length !== COLS){ startNewGame(); return; }
     stacks = state.stacks.map(col => Array.isArray(col) ? col.map(Number) : []);
     score = Number(state.score) || 0;
-    combo = Number(state.combo) || 0;
     dropCount = Number(state.dropCount) || 0;
+    maxLevel = Number(state.maxLevel) || 1;   // v4.9: 恢复最大合成数（旧存档没这字段则回 1）
     nextQueue = Array.isArray(state.nextQueue) ? state.nextQueue.map(Number) : [];
     if (nextQueue.length < 2) nextQueue = [rollLevel(), rollLevel()];
     running = true; busy = false;
@@ -1190,7 +1167,10 @@ const EMOJI_IMGS = [
     try { localStorage.setItem(NICK_KEY, nickname); } catch (e) {}
     whoNameEl.textContent = nickname || '未登录';
     const local = loadLocalSave();
-    const state = local || await checkCloudSave();
+    // v4.9: 本地存档绑昵称——同一设备换账号时，不用别人的本地存档，改查本人云端
+    // （旧版存档没有 nickname 字段：同设备默认视为本人，兼容放行）
+    const localMatch = local && (!local.nickname || local.nickname === nickname);
+    const state = localMatch ? local : await checkCloudSave();
     if (state){
       restoreGame(state);
     } else {
@@ -1200,16 +1180,17 @@ const EMOJI_IMGS = [
 
   // ===== 初始化 =====
   function init(){
+    gen++;             // v4.9: 局号+1，上一局未跑完的异步连锁/结算全部作废
+    queuedCol = -1;    // 清空排队点击
     stacks = [];
     for (let c = 0; c < COLS; c++) stacks.push([]);
-    score = 0; combo = 0; dropCount = 0; maxLevel = 1;
+    score = 0; dropCount = 0; maxLevel = 1;
     running = true; busy = false;
     updateScore();
     comboEl.textContent = '';
     nextQueue = [rollLevel(), rollLevel()];
     render();
     renderNext();
-    overlay.classList.remove('show');
     fitBoard();
   }
 
@@ -1226,12 +1207,15 @@ const EMOJI_IMGS = [
     if (col) drop(parseInt(col.dataset.col, 10));
   });
   // 键盘 1-6 投放
+  // v4.9: 昵称框聚焦（打数字会穿透投放）或任何弹窗打开时，键盘不触发投放
   document.addEventListener('keydown', (e) => {
-    if (/^[1-6]$/.test(e.key)) drop(parseInt(e.key, 10) - 1);
+    if (!/^[1-6]$/.test(e.key)) return;
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if (nameOverlay.classList.contains('show') || rankOverlay.classList.contains('show')) return;
+    drop(parseInt(e.key, 10) - 1);
   });
 
   document.getElementById('restartBtn').addEventListener('click', startNewGame);
-  document.getElementById('againBtn').addEventListener('click', startNewGame);
   // v4.8.4 修复：不能直接传 showRank——事件对象会被当成 fromGame 参数（truthy）导致 afterGameRank=true，关闭时误开新局清空棋盘
   document.getElementById('rankBtn').addEventListener('click', () => showRank(false));
   const muteBtn = document.getElementById('muteBtn');
@@ -1246,7 +1230,6 @@ const EMOJI_IMGS = [
     rankOverlay.classList.remove('show');
     if (afterGameRank){ afterGameRank = false; startNewGame(); }   // v4.8: 结算弹榜关闭后自动开新局
   });
-  document.getElementById('endRankBtn').addEventListener('click', () => { overlay.classList.remove('show'); showRank(); });
   document.getElementById('whoBtn').addEventListener('click', showNameOverlay);
   nameStart.addEventListener('click', onNameStart);
   nameContinue.addEventListener('click', onNameContinue);
