@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v4.9.11</title>
+  <title>动物泡澡 · 手搓版 v4.9.12</title>
+  <!-- v4.9.12：大数字库存控制（安琪拍板 A，6 不压）——7-10 掉落解锁条件从"棋盘有该值"升级为"棋盘有该值且未超库存"：7≥4、8≥3、9≥3、10≥2 个时该档停掉、概率分给 3-6。大数字以旧换新，棋盘永远消化得动（类 Threes 牌组封顶）；6 保持 25 投解锁、占比不变 -->
   <!-- v4.9.11：①大数字不再坑人——7-10 只在棋盘已有该值时才会掉（安琪拍板 B，Threes 式跟随棋盘）：首个 7 只能靠合成（6+6 或 5+5+5），合出后才会出现在掉落里；棋盘没有该值时概率自然分给 3-6，掉下来的大数字永远有配对，不再是死块；原"每 25 投解锁一档"节奏删除（顺带消除 100/125 进度不一致）②落子节奏统一 260ms——落子动画 0.34s→0.26s、合成开始 230→260，方块落稳即合成，不再没落稳就闪（安琪拍板 A） -->
 <!-- v4.9.9：7-10 掉落概率改精确递减 7→4%、8→3%、9→2%、10→1%（安琪定）——高段权重锚定 1-6 权重和：w=p·S/(1-Σp)，任何解锁进度下占比精确等于目标；推翻 v4.9.4 固定 0.23 平台（只有后期才约 4%） -->
 <!-- v4.9.8：推翻 v4.9.7 横向铺满（列被拉散体验差）——五列保持紧挨（列距=行距），浴缸宽度收窄到刚好包住五列，两边留白删掉；宽度改从父容器取，防 board 显式宽度反馈收缩 -->
@@ -355,7 +356,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9.11</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.9.12</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -400,7 +401,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v4.9.11 · 五列 · 越线才结束 · 大数字有配对才掉</div>
+      <div class="ver" id="verLink" title="查看更新说明">v4.9.12 · 五列 · 越线才结束 · 大数字限量供应</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <div class="name-err" id="nameErr" style="display:none"></div>
@@ -449,6 +450,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
+  const VER = 'v4.9.12';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -564,15 +566,20 @@ const EMOJI_IMGS = [
       w.push(weight); lv.push(i);
       s36 += weight;
     }
+    // v4.9.12: 大数字库存控制（安琪拍板 A，6 不压）——7≥4/8≥3/9≥3/10≥2 时该档停掉、概率分给 3-6；
+    //          大数字"以旧换新"：想掉新的先合掉旧的，棋盘永远消化得动（类 Threes 牌组封顶）
+    const CAP = [0, 0, 0, 0, 0, 0, 0, 4, 3, 3, 2];   // 下标=等级：棋盘该值达到上限即停掉掉落
+    const cnt = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (const col of stacks) for (const v of col) if (v >= 7 && v <= 10) cnt[v]++;
     let pSum = 0;
     for (let i = 7; i <= 10; i++){
-      if (stacks.some(col => col.includes(i))) pSum += HI_P[i];   // v4.9.11: 只锚定棋盘已有的档
+      if (cnt[i] > 0 && cnt[i] < CAP[i]) pSum += HI_P[i];   // v4.9.11 棋盘已有 + v4.9.12 库存未满
     }
     const anchor = s36 / (1 - p1T - p2T - pSum);
     w[0] = p1T * anchor;
     w[1] = p2T * anchor;
     for (let i = 7; i <= 10; i++){
-      if (stacks.some(col => col.includes(i))){   // v4.9.11: 棋盘已有该值才加入掉落
+      if (cnt[i] > 0 && cnt[i] < CAP[i]){   // v4.9.11 棋盘已有该值 + v4.9.12 库存未满才加入掉落
         w.push(HI_P[i] * anchor);
         lv.push(i);
       }
@@ -1025,7 +1032,7 @@ const EMOJI_IMGS = [
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
   function saveGame(){
     if (!nickname) return;
-    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）
+    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname, ver: VER };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）；v4.9.12: 带版本号（旧版存档作废）
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
     if (cloudTimer) clearTimeout(cloudTimer);
     cloudTimer = setTimeout(() => {
@@ -1078,8 +1085,17 @@ const EMOJI_IMGS = [
     }
   }
 
+  // v4.9.12: 存档版本校验——旧版本（含无版本号）的存档视为无效，直接作废清掉
+  function saveIsCurrent(state){
+    return !!state && state.ver === VER;
+  }
+
   function loadLocalSave(){
-    try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { return null; }
+    try {
+      const state = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (state && !saveIsCurrent(state)){ clearSave(); return null; }   // v4.9.12: 旧版本本地存档作废（迭代重开不代入旧局）
+      return state;
+    } catch (e) { return null; }
   }
 
   async function checkCloudSave(){
@@ -1087,13 +1103,21 @@ const EMOJI_IMGS = [
     try {
       const r = await sbFetch('saves?select=state&nickname=eq.' + encodeURIComponent(nickname) + '&limit=1');
       const rows = await r.json();
-      return (Array.isArray(rows) && rows.length) ? rows[0].state : null;
+      if (Array.isArray(rows) && rows.length){
+        const state = rows[0].state;
+        if (!saveIsCurrent(state)){   // v4.9.12: 旧版本云端存档作废
+          sbFetch('saves?nickname=eq.' + encodeURIComponent(nickname), { method: 'DELETE' }).catch(() => {});
+          return null;
+        }
+        return state;
+      }
+      return null;
     } catch (e) { return null; }
   }
 
   // 恢复存档
   function restoreGame(state){
-    if (!state || !Array.isArray(state.stacks) || state.stacks.length !== COLS){ startNewGame(); return; }
+    if (!state || !saveIsCurrent(state) || !Array.isArray(state.stacks) || state.stacks.length !== COLS){ startNewGame(); return; }   // v4.9.12: 版本不符防御兜底
     stacks = state.stacks.map(col => Array.isArray(col) ? col.map(Number) : []);
     score = Number(state.score) || 0;
     dropCount = Number(state.dropCount) || 0;
@@ -1355,6 +1379,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v4.9.12', '大数字限量供应：棋盘上 7 太多（≥4 个）或 8/9 太多（≥3 个）或 10 太多（≥2 个）时，该数字暂时不掉——先合掉旧的，才掉新的；版本更新后旧存档自动作废，重新开始会刷新页面'],
     ['v4.9.11', '大数字不再坑人：7-10 只在棋盘已有配对时才掉落（合出过 7 才会掉 7），没有配对的大数字不会再掉下来占格子；落子更利落：方块落稳即合成，节奏更顺'],
     ['v4.9.10', '后期小数字变少：1 和 2 的掉落占比随进度压到各 2%（开局约 11%/25%）'],
     ['v4.9.9', '7-10 掉落概率精确递减：7→4%、8→3%、9→2%、10→1%'],
@@ -1380,7 +1405,8 @@ const EMOJI_IMGS = [
   document.getElementById('updClose').addEventListener('click', () => { updOverlay.classList.remove('show'); });
   document.getElementById('verLink').addEventListener('click', () => { updOverlay.classList.add('show'); });
 
-  document.getElementById('restartBtn').addEventListener('click', startNewGame);
+  // v4.9.12: 重开 = 清档 + 强制刷新页面（安琪要求：随时在迭代，重开必须加载最新代码，不代入上一局/上一版本任何状态）
+  document.getElementById('restartBtn').addEventListener('click', () => { clearSave(); location.reload(); });
   // v4.8.4 修复：不能直接传 showRank——事件对象会被当成 fromGame 参数（truthy）导致 afterGameRank=true，关闭时误开新局清空棋盘
   document.getElementById('rankBtn').addEventListener('click', () => showRank(false));
   const muteBtn = document.getElementById('muteBtn');
