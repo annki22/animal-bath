@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.6</title>
-<!-- v4.6：底部按钮两行布局修复 + 更欢乐 BGM（I-V-vi-IV 琶音卡通风）；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
+<title>动物泡澡 · 手搓版 v4.8</title>
+<!-- v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -81,7 +81,7 @@
   }
   .cols-bg {
     position: absolute; inset: 0;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     padding: 4px;
   }
   .col-bg {
@@ -147,10 +147,12 @@
     60% { transform: scale(.94) translateY(1px); filter: brightness(1.15); }
     100% { transform: scale(1) translateY(0); filter: brightness(1); }
   }
-  .tile.fall { animation: fallIn .24s cubic-bezier(.22,.9,.3,1); }
+  .tile.fall { animation: fallIn .34s cubic-bezier(.22,.9,.3,1); }
   @keyframes fallIn {
     0% { transform: translateY(-150px) scale(.9); opacity: .4; }
-    100% { transform: translateY(0) scale(1); opacity: 1; }
+    70% { transform: translateY(0) scale(1.12, .88); opacity: 1; }
+    85% { transform: translateY(0) scale(.95, 1.05); }
+    100% { transform: translateY(0) scale(1); }
   }
   .tile.shake { animation: shake .3s ease; }
   @keyframes shake {
@@ -158,10 +160,19 @@
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
   }
-  .tile.merge-pop { animation: mergePop .45s cubic-bezier(.34,1.56,.64,1); }
+  .tile.merge-pop { animation: mergePop .5s cubic-bezier(.34,1.56,.64,1); }
   @keyframes mergePop {
-    0% { transform: scale(.3); opacity: .4; }
-    100% { transform: scale(1); opacity: 1; }
+    0% { transform: scale(.2); opacity: 0; filter: brightness(2); }
+    55% { transform: scale(1.28); opacity: 1; filter: brightness(1.5); }
+    75% { transform: scale(.94); filter: brightness(1.1); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+  /* 合成后的短暂金色光晕（v4.8 提升合成反馈） */
+  .tile.merge-glow { animation: mergeGlow .7s ease-out; }
+  @keyframes mergeGlow {
+    0% { box-shadow: 0 0 0 rgba(255,215,94,0); }
+    25% { box-shadow: 0 0 22px 6px rgba(255,215,94,.75); }
+    100% { box-shadow: 0 0 0 rgba(255,215,94,0); }
   }
   /* 合成预备：两个方块碰撞闪烁 */
   .tile.merge-flash {
@@ -170,7 +181,8 @@
   }
   @keyframes mergeFlash {
     0% { transform: scale(1); filter: brightness(1); }
-    40% { transform: scale(1.22) translateY(-3px); filter: brightness(1.7); }
+    40% { transform: scale(1.35) translateY(-4px); filter: brightness(1.8); }
+    70% { transform: scale(.95); filter: brightness(1.1); }
     100% { transform: scale(1); filter: brightness(1); }
   }
   /* 合成消失：参与合成的旧方块缩小淡出 */
@@ -180,13 +192,13 @@
   }
   @keyframes mergeGone {
     0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(.15); opacity: 0; }
+    100% { transform: scale(.1) rotate(25deg); opacity: 0; }
   }
 
   /* 列（点击层） */
   .cols {
     position: absolute; inset: 0;
-    display: grid; grid-template-columns: repeat(5, 1fr);
+    display: grid; grid-template-columns: repeat(6, 1fr);
     z-index: 5;
   }
   .col {
@@ -316,12 +328,14 @@
   .rank-row { display: flex; align-items: center; padding: 8px 6px; border-bottom: 1px solid #F0EFEA; font-size: 14px; }
   .rank-row:last-child { border-bottom: none; }
   .rank-row.me { background: #FFF6DE; border-radius: 10px; }
-  .rank-no { width: 32px; font-weight: 800; color: #9AA0A8; font-variant-numeric: tabular-nums; }
+  .rank-no { width: 46px; font-weight: 800; color: #9AA0A8; font-variant-numeric: tabular-nums; }
   .rank-row:nth-child(1) .rank-no { color: #F0B62E; }
   .rank-row:nth-child(2) .rank-no { color: #B8BEC6; }
   .rank-row:nth-child(3) .rank-no { color: #C88F5A; }
   .rank-name { flex: 1; font-weight: 600; color: #2F3542; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rank-score { font-weight: 800; color: #2F3542; font-variant-numeric: tabular-nums; }
+  .rank-max { font-size: 11px; color: #9AA0A8; margin-left: 8px; white-space: nowrap; }
+  .rank-max b { color: #F08C2E; }
   .rank-empty { color: #9AA0A8; font-size: 13px; padding: 20px 0; }
   .rank-mine { font-size: 12px; color: #9AA0A8; margin-bottom: 10px; }
   .rank-loading { color: #9AA0A8; font-size: 13px; padding: 24px 0; }
@@ -330,7 +344,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.6</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -357,7 +371,7 @@
   </div>
 
   <div class="bottombar">
-    <div class="hint">点<b>列</b>投放，相同动物<b>自动合成</b></div>
+    <div class="hint">点<b>列</b>投放（或按 <b>1-6</b>），相同动物<b>自动合成</b></div>
     <div class="bar2">
       <span class="combo" id="combo"></span>
       <div class="btn-row">
@@ -387,7 +401,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.6 · 按钮修复 · 新BGM</div>
+      <div class="ver">v4.8 · 六列 · 警戒线结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -412,7 +426,7 @@
   'use strict';
 
   // ===== 配置 =====
-  const COLS = 5;
+  const COLS = 6;
   // v4.3: 合成无上限（11+11 → 12 → 13 …一直往上，2026-08-18 用户要求"不要卡在11"）
   // 等级超过 40 时动物回退 🐾、颜色用 HSL 自动生成（见 getAnimal/getGrad）
   const MAX_ROWS = 12;       // 最多堆 12 层（窗口够高时）
@@ -536,7 +550,7 @@ const EMOJI_IMGS = [
 
   // ===== 音效（Web Audio 轻量合成） =====
   let actx = null;
-  let muted = false;   // 全局静音：音效 + BGM 一起关（localStorage 持久化）
+  let muted = false;   // 全局静音：只关音效（localStorage 持久化）
   try { muted = localStorage.getItem('animalBathMuted') === '1'; } catch (e) {}
   function beep(freq, dur, type, vol, when){
     if (muted) return;
@@ -566,55 +580,14 @@ const EMOJI_IMGS = [
     beep(base * 1.5, 0.16, 'sine', 0.12, 0.13);
   }
 
-  // ===== BGM（Web Audio 程序化合成，无外部文件，单文件自包含） =====
-  // C 大调 I-V-vi-IV 琶音上行回落（do-mi-sol-mi 卡通风，BPM≈176，每音 0.34s）
-  // 低音 I-V-vi-IV（C G A F）每 4 步一个，与旋律 16 步完美对齐
-  const BGM_MELODY = [523.25, 659.25, 783.99, 659.25,
-                      392.00, 493.88, 587.33, 493.88,
-                      440.00, 523.25, 659.25, 523.25,
-                      349.23, 440.00, 523.25, 440.00];
-  const BGM_BASS   = [130.81, 196.00, 220.00, 174.61];
-  let bgmTimer = null, bgmStep = 0;
-  function playTone(freq, when, dur, type, vol){
-    try {
-      if (!actx) return;
-      const t = actx.currentTime + when;
-      const o = actx.createOscillator();
-      const g = actx.createGain();
-      o.type = type; o.frequency.value = freq;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g); g.connect(actx.destination);
-      o.start(t); o.stop(t + dur + 0.05);
-    } catch(e){}
-  }
-  function startBGM(){
-    if (muted || bgmTimer) return;
-    try {
-      if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      if (actx.state === 'suspended') actx.resume();
-      bgmStep = 0;
-      bgmTimer = setInterval(bgmTick, 340);
-    } catch(e){}
-  }
-  function stopBGM(){
-    if (bgmTimer){ clearInterval(bgmTimer); bgmTimer = null; }
-  }
-  function bgmTick(){
-    if (!actx || actx.state === 'suspended') return;
-    const i = bgmStep % BGM_MELODY.length;
-    playTone(BGM_MELODY[i], 0, 0.28, 'triangle', 0.09);
-    if (bgmStep % 4 === 0) playTone(BGM_BASS[(bgmStep / 4) % BGM_BASS.length | 0], 0, 0.3, 'sine', 0.075);
-    bgmStep++;
-  }
-
   // ===== 状态 =====
   let stacks = [];       // 每列数组（底部 -> 顶部）
   let score = 0;
   let combo = 0;
   let best = 0;
   try { best = parseInt(localStorage.getItem('animalBathBest') || '0', 10); } catch (e) { /* file:// 下部分浏览器禁止 localStorage，忽略 */ }
+  let maxLevel = 1;          // 本局最大合成数字（v4.8：排行榜展示）
+  let afterGameRank = false; // 结算弹榜模式：关闭排行榜后自动开新局
   let nextQueue = [rollLevel(), rollLevel()];
   let running = false;
   let busy = false;      // 合成动画进行中，禁止继续投放
@@ -744,9 +717,10 @@ const EMOJI_IMGS = [
     ft.style.top = y + 'px';
     fx.appendChild(ft);
 
-    // 粒子
+    // 粒子（v4.8: 连击越多粒子越多，合成反馈更爽）
     const colors = ['#FF7B93','#FFD75E','#7ED6A5','#8FC7FF'];
-    for (let i = 0; i < 8; i++){
+    const pCount = Math.min(16, 8 + (chain - 1) * 2);
+    for (let i = 0; i < pCount; i++){
       const p = document.createElement('div');
       p.className = 'particle';
       p.style.left = cx + 'px';
@@ -769,7 +743,6 @@ const EMOJI_IMGS = [
   function drop(colIdx){
     if (!running || busy) return;
     busy = true;
-    if (!bgmTimer && !muted) startBGM();   // 兜底：任何投放手势都可启动 BGM（浏览器自动播放策略）
     dropCount++;
     const level = nextQueue.shift();
     nextQueue.push(rollLevel());
@@ -890,6 +863,7 @@ const EMOJI_IMGS = [
       // 吸收 k 个相同 → 跳 k 级（结果留在当前处理位置）
       // v4.3: 无上限合成——11+11 → 12，一直往上（2026-08-18 用户要求"不要卡在11"）
       const nl = level + same.length;
+      if (nl > maxLevel) maxLevel = nl;   // v4.8: 记录本局最大合成数字
       // 1) 预备：所有参与方块碰撞闪烁
       await flashSet(c, r, same);
       // 2) 被吸收的方块缩小消失
@@ -924,8 +898,8 @@ const EMOJI_IMGS = [
       const tiles = colsEl.children[c].querySelectorAll('.stack .tile');
       const el = tiles[newRow];
       if (el){
-        el.classList.add('merge-pop');
-        setTimeout(() => el.classList.remove('merge-pop'), 500);
+        el.classList.add('merge-pop', 'merge-glow');
+        setTimeout(() => el.classList.remove('merge-pop', 'merge-glow'), 800);
       }
       // 合成成功：等级越高音越亮，快速上行琶音（更有满足感）
       mergeSound(nl);
@@ -971,7 +945,7 @@ const EMOJI_IMGS = [
   async function checkGameOver(){
     let over = false;
     for (let c = 0; c < COLS; c++){
-      if (stacks[c].length > overRow) { over = true; break; }
+      if (stacks[c].length >= overRow) { over = true; break; }   // v4.8: 触达警戒线直接结束（不再等越过一格）
     }
     if (over){
       running = false;
@@ -984,18 +958,13 @@ const EMOJI_IMGS = [
         newBestEl.style.display = 'none';
       }
       endScore.textContent = score.toLocaleString();
-      // 结算：先提交分数到排行榜，成功后再弹窗（避免玩家刷新/关闭导致丢分）
-      // 与最后的合成动画（≥500ms）并行，不额外等待
-      endSubmit.style.display = 'block';
-      endSubmit.className = 'submit-status';
-      endSubmit.textContent = '正在提交分数…';
-      const [ok] = await Promise.all([
+      // v4.8: 结算直接弹排行榜（显示名次 + 超越多少人），关闭排行榜后自动开新局
+      // 提交分数与最后的合成动画（≥500ms）并行，不额外等待
+      await Promise.all([
         submitScore(),
         new Promise(r => setTimeout(r, 500))
       ]);
-      endSubmit.textContent = ok ? '已计入排行榜 ✓' : '提交失败，分数未上榜';
-      if (!ok) endSubmit.classList.add('fail');
-      overlay.classList.add('show');
+      showRank(true);
     }
   }
 
@@ -1065,7 +1034,6 @@ const EMOJI_IMGS = [
     clearSave();
     init();
     hideNameOverlay();
-    startBGM();   // 用户手势内启动背景音乐
   }
 
   // 结算：提交分数到排行榜（同名已有更高分则跳过）。返回是否成功
@@ -1081,10 +1049,18 @@ const EMOJI_IMGS = [
       const p = await sbFetch('scores', {
         method: 'POST',
         headers: { 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ nickname: nickname, score: score, max_level: maxLevel }),
+        signal: ctrl.signal
+      });
+      if (p.ok) return true;
+      // v4.8 兼容：旧表没有 max_level 列（PGRST204）→ 降级只提交分数
+      const p2 = await sbFetch('scores', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' },
         body: JSON.stringify({ nickname: nickname, score: score }),
         signal: ctrl.signal
       });
-      return p.ok;
+      return p2.ok;
     } catch (e) {
       return false;   // 离线/失败：不影响游玩，弹窗提示未上榜
     } finally {
@@ -1092,35 +1068,36 @@ const EMOJI_IMGS = [
     }
   }
 
-  // 拉取排行榜：同名取最高分，Top 20 + 我的排名
+  // 拉取排行榜：同名取最高分，Top 20 + 我的排名 + 总人数
   async function fetchBoardList(){
-    const r = await sbFetch('scores?select=nickname,score&order=score.desc&limit=200');
+    const r = await sbFetch('scores?select=nickname,score,max_level&order=score.desc&limit=200');
     const rows = await r.json();
-    if (!Array.isArray(rows)) return { list: [], mine: null };
+    if (!Array.isArray(rows)) return { list: [], mine: null, total: 0 };
     const map = new Map();
     for (const row of rows){
       const prev = map.get(row.nickname);
-      if (!prev || row.score > prev.score) map.set(row.nickname, { nickname: row.nickname, score: row.score });
+      if (!prev || row.score > prev.score) map.set(row.nickname, { nickname: row.nickname, score: row.score, maxLevel: row.max_level || 1 });
     }
-    const list = [...map.values()].sort((a, b) => b.score - a.score).slice(0, 20);
+    const all = [...map.values()].sort((a, b) => b.score - a.score);
+    const list = all.slice(0, 20);
     let mine = null;
     if (nickname){
-      const all = [...map.values()].sort((a, b) => b.score - a.score);
       const idx = all.findIndex(x => x.nickname === nickname);
-      if (idx >= 0) mine = { rank: idx + 1, score: all[idx].score };
+      if (idx >= 0) mine = { rank: idx + 1, score: all[idx].score, maxLevel: all[idx].maxLevel || 1 };
     }
-    return { list: list, mine: mine };
+    return { list: list, mine: mine, total: all.length };
   }
 
-  // 展示排行榜
-  async function showRank(){
+  // 展示排行榜。fromGame=true 表示结算直显：顶部显示本局名次 + 超越人数，关闭后自动开新局
+  async function showRank(fromGame){
+    afterGameRank = !!fromGame;
     rankOverlay.classList.add('show');
     rankLoading.style.display = 'block';
     rankList.style.display = 'none';
     rankMine.style.display = 'none';
     rankList.innerHTML = '';
     try {
-      const { list, mine } = await fetchBoardList();
+      const { list, mine, total } = await fetchBoardList();
       rankLoading.style.display = 'none';
       if (list.length === 0){
         rankList.style.display = 'block';
@@ -1128,12 +1105,21 @@ const EMOJI_IMGS = [
       } else {
         rankList.style.display = 'block';
         rankList.innerHTML = list.map((row, i) =>
-          '<div class="rank-row' + (row.nickname === nickname ? ' me' : '') + '"><span class="rank-no">' + (i + 1) + '</span><span class="rank-name">' + escapeHtml(row.nickname) + '</span><span class="rank-score">' + row.score.toLocaleString() + '</span></div>'
+          '<div class="rank-row' + (row.nickname === nickname ? ' me' : '') + '"><span class="rank-no">' + (i < 3 ? '👑' : '') + (i + 1) + '</span><span class="rank-name">' + escapeHtml(row.nickname) + '</span><span class="rank-score">' + row.score.toLocaleString() + '</span><span class="rank-max">合<b>' + (row.maxLevel || 1) + '</b></span></div>'
         ).join('');
       }
       if (mine){
         rankMine.style.display = 'block';
-        rankMine.textContent = '我的排名：第 ' + mine.rank + ' 名 · ' + mine.score.toLocaleString() + ' 分';
+        if (afterGameRank){
+          const beat = Math.max(0, total - mine.rank);
+          rankMine.textContent = '本局 ' + score.toLocaleString() + ' 分 · 第 ' + mine.rank + ' 名 · 超越 ' + beat + ' 人';
+        } else {
+          rankMine.textContent = '我的排名：第 ' + mine.rank + ' 名 · ' + mine.score.toLocaleString() + ' 分';
+        }
+      } else if (afterGameRank){
+        // 提交失败/未上榜：结算也要给个交代
+        rankMine.style.display = 'block';
+        rankMine.textContent = '本局 ' + score.toLocaleString() + ' 分 · 未上榜（提交失败？）';
       }
     } catch (e){
       rankLoading.style.display = 'none';
@@ -1191,7 +1177,7 @@ const EMOJI_IMGS = [
   function init(){
     stacks = [];
     for (let c = 0; c < COLS; c++) stacks.push([]);
-    score = 0; combo = 0; dropCount = 0;
+    score = 0; combo = 0; dropCount = 0; maxLevel = 1;
     running = true; busy = false;
     updateScore();
     comboEl.textContent = '';
@@ -1214,9 +1200,9 @@ const EMOJI_IMGS = [
     const col = e.target.closest('.col');
     if (col) drop(parseInt(col.dataset.col, 10));
   });
-  // 键盘 1-5 投放
+  // 键盘 1-6 投放
   document.addEventListener('keydown', (e) => {
-    if (/^[1-5]$/.test(e.key)) drop(parseInt(e.key, 10) - 1);
+    if (/^[1-6]$/.test(e.key)) drop(parseInt(e.key, 10) - 1);
   });
 
   document.getElementById('restartBtn').addEventListener('click', startNewGame);
@@ -1228,15 +1214,12 @@ const EMOJI_IMGS = [
     muted = !muted;
     try { localStorage.setItem('animalBathMuted', muted ? '1' : '0'); } catch (e) {}
     muteBtn.textContent = muted ? '🔇' : '🔊';
-    if (muted) stopBGM(); else startBGM();
     if (!muted) beep(880, 0.08, 'sine', 0.1);   // 开启时给个反馈音
   });
-  // 页面隐藏时暂停 BGM（切后台不吵 + 省电），回到页面自动恢复
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopBGM();
-    else if (!muted) startBGM();
+  document.getElementById('rankClose').addEventListener('click', () => {
+    rankOverlay.classList.remove('show');
+    if (afterGameRank){ afterGameRank = false; startNewGame(); }   // v4.8: 结算弹榜关闭后自动开新局
   });
-  document.getElementById('rankClose').addEventListener('click', () => rankOverlay.classList.remove('show'));
   document.getElementById('endRankBtn').addEventListener('click', () => { overlay.classList.remove('show'); showRank(); });
   document.getElementById('whoBtn').addEventListener('click', showNameOverlay);
   nameStart.addEventListener('click', onNameStart);
