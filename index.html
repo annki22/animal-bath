@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.8.2</title>
-<!-- v4.8.2：max_level 每局就地更新（不等破纪录）+ 排行榜最大合成列去"合"字；v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
+<title>动物泡澡 · 手搓版 v4.8.3</title>
+<!-- v4.8.3：破纪录时新行继承历史最大合成——最大分值与最大合成数各自保持历史最佳；v4.8.2：max_level 每局就地更新（不等破纪录）+ 排行榜最大合成列去"合"字；v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -343,7 +343,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.2</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.3</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -400,7 +400,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.8.2 · 六列 · 警戒线结束 · 皇冠排行</div>
+      <div class="ver">v4.8.3 · 六列 · 警戒线结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -1044,23 +1044,27 @@ const EMOJI_IMGS = [
     try {
       const r = await sbFetch('scores?select=score,max_level&nickname=eq.' + encodeURIComponent(nickname) + '&order=score.desc&limit=1', { signal: ctrl.signal });
       const rows = await r.json();
-      if (Array.isArray(rows) && rows.length && rows[0].score >= score){
-        // v4.8.2: 分数不更高，但本局最大合成可能更大 → 就地更新最高纪录行的 max_level
-        const oldMax = rows[0].max_level || 1;
-        if (maxLevel > oldMax){
-          await sbFetch('scores?nickname=eq.' + encodeURIComponent(nickname) + '&score=eq.' + rows[0].score, {
-            method: 'PATCH',
-            headers: { 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ max_level: maxLevel }),
-            signal: ctrl.signal
-          });
+      let histMax = 1;   // 该昵称历史最大合成（保持"每个人的最大合成数"独立最佳）
+      if (Array.isArray(rows) && rows.length){
+        histMax = rows[0].max_level || 1;
+        if (rows[0].score >= score){
+          // v4.8.2: 分数不更高，但本局最大合成可能更大 → 就地更新最高纪录行的 max_level
+          if (maxLevel > histMax){
+            await sbFetch('scores?nickname=eq.' + encodeURIComponent(nickname) + '&score=eq.' + rows[0].score, {
+              method: 'PATCH',
+              headers: { 'Prefer': 'return=minimal' },
+              body: JSON.stringify({ max_level: maxLevel }),
+              signal: ctrl.signal
+            });
+          }
+          return true;
         }
-        return true;
       }
       const p = await sbFetch('scores', {
         method: 'POST',
         headers: { 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ nickname: nickname, score: score, max_level: maxLevel }),
+        // v4.8.3: 破纪录时继承历史最大合成——最大分值与最大合成数各自保持历史最佳
+        body: JSON.stringify({ nickname: nickname, score: score, max_level: Math.max(maxLevel, histMax) }),
         signal: ctrl.signal
       });
       if (p.ok) return true;
