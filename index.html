@@ -406,26 +406,29 @@
   ];
 
   // 新动物生成：从小到大，大数字只能靠合成
-  //  · 掉落上限随投放次数缓慢放开：0-29投只有 1-3，30投出4，60投出5，90投才到 6
+  //  · 掉落上限随投放次数放开：开局允许 5，30投出6（对齐原游戏节奏：开局即有 4/5 掉落）
   //  · 7 级以上（7-11）永远不会直接掉落，只能靠合成
-  //  · 权重集中在 1-3（合成的基础），4-6 概率低
+  //  · 权重重心 3.4→4.2，1 级低频（原游戏实测 1 占比仅 ~11%）
   let dropCount = 0;         // 已投放次数（难度进度）
 
   function rollLevel(){
-    // 当前允许掉落的最高等级：3 → 4 → 5 → 6（约 30 投 +1，上限 6）
-    const maxDrop = Math.min(6, 3 + Math.floor(dropCount / 30));
-    const d = Math.min(1, dropCount / 120);   // 进度 0→1
-    const center = 2 + d * 1.2;               // 重心缓慢从 2 移到 3.2
-    const sigma = 1.0 + d * 1.2;              // 后期分布略宽
+    // v4.2 掉落节奏：对齐原游戏《动物泳场》实测（2026-08-18 视频 265s 分析）
+    //  · 原游戏开局就直接掉 4/5（前 80s 分布：1:11% 2:20% 3:24% 4:31% 5:13%），
+    //    旧版开局只掉 1-3 且 1 占 ~47%，玩家反馈"1 太多、玩很久不见大数字"。
+    //  · 新节奏：开局允许 5，30 投后出 6；重心 3.4 → 4.2，1 级不再是主力。
+    const maxDrop = Math.min(6, 5 + Math.floor(dropCount / 30));
+    const d = Math.min(1, dropCount / 100);   // 进度 0→1（100 投到顶）
+    const center = 3.4 + d * 0.8;             // 重心 3.4 → 4.2
+    const sigma = 1.15 + d * 0.3;             // 后期分布略宽
     const w = [];
     for (let i = 1; i <= maxDrop; i++){
       const dist = Math.abs(i - center);
       let weight = Math.exp(-(dist * dist) / (2 * sigma * sigma));
-      // 保底：1、2、3 始终高频（合成的基础，保证游戏可持续）
-      if (i === 1) weight += 2.5;
-      if (i === 2) weight += 2.0;
-      if (i === 3) weight += 1.2;
-      w.push(Math.max(weight, 0.25));
+      // 保底：1、2、3 保持一定频率（合成的基础，保证游戏可持续），但大幅低于旧版
+      if (i === 1) weight += 0.35;
+      if (i === 2) weight += 0.55;
+      if (i === 3) weight += 0.45;
+      w.push(Math.max(weight, 0.2));
     }
     const total = w.reduce((a,b)=>a+b, 0);
     let r = Math.random() * total;
@@ -668,23 +671,6 @@
     return same;
   }
 
-  // 下移检测（2026-08-18 修复）：splice 删除方块后，受影响列上方的方块会下移一格。
-  // 若下移方块因此与"新邻居"（下方/左右）相同——比如 [3,2] 的 3 被吃掉后 2 掉到底部，
-  // 与旁边列的 2 变成同行相邻——按玩家直觉应该继续合成。
-  // 只查受影响列，不扫描全盘（保持 v3 规则：别处静态相邻的相同方块不误合）
-  function findCascade(sorted){
-    for (const s of sorted){
-      const col = stacks[s.col];
-      for (let r = s.row; r < col.length; r++){
-        const v = col[r];
-        if (r > 0 && col[r-1] === v) return { col: s.col, row: r };
-        if (s.col > 0 && stacks[s.col-1][r] === v) return { col: s.col, row: r };
-        if (s.col < COLS - 1 && stacks[s.col+1][r] === v) return { col: s.col, row: r };
-      }
-    }
-    return null;
-  }
-
   // 参与合成的一组方块碰撞闪烁（中心 + 所有被吸收的）
   function flashSet(colIdx, row, same){
     return new Promise(resolve => {
@@ -725,40 +711,87 @@
   }
 
   async function settleMerge(colIdx){
-    let chains = 0;
-    let lastCol = colIdx, lastRow = stacks[colIdx].length - 1;
-    while (true){
-      const same = findNeighbors(lastCol, lastRow);
-      if (same.length === 0) break;
-      const level = stacks[lastCol][lastRow];
-      // 吸收 k 个相同 → 跳 k 级（结果留在掉落位置）
-      const nl = Math.min(level + same.length, MAX_LEVEL);
+    let chains = 0, guard = 0;
+    let lastC = -1, lastR = -1;   // 最后一次合成/消除位置（spawnFX 用）
+    // 队列式连锁（2026-08-18 v4.2 修复）：
+    // 每次合成后，把"升级位置"和"每个删除位置的下移链"全部入队，逐个处理。
+    // 修复 findCascade 两个漏洞：① 返回坐标错误（相同方块在相邻列时返回自己列，
+    //   导致合成结果放错位置 → 同列相邻相同方块出现）；② 升级位置与删除列只能二选一，
+    //   另一个被遗忘 → 棋盘遗留非法状态。
+    const queue = new Set();
+    queue.add(colIdx + ',' + (stacks[colIdx].length - 1));
+    while (queue.size > 0){
+      if (++guard > 500) break;   // 死循环保险
+      const key = queue.values().next().value;
+      queue.delete(key);
+      const keyParts = key.split(',');
+      const c = +keyParts[0], r = +keyParts[1];
+      if (c < 0 || c >= COLS || r < 0 || r >= stacks[c].length) continue;  // 位置已失效
+      const same = findNeighbors(c, r);
+      if (same.length === 0) continue;
+      const level = stacks[c][r];
+      // 吸收 k 个相同 → 跳 k 级（结果留在当前处理位置）
+      const nlRaw = level + same.length;
+      if (nlRaw > MAX_LEVEL){
+        // 满级合成（如 11+11）：参与方块全部消除，不留新方块。
+        // 旧逻辑 Math.min 截断回 11 → 两个 11 永远卡在 11（2026-08-18 用户反馈）。
+        // 消除后下方方块掉落 → 入队下移链继续连锁。
+        await flashSet(c, r, same);
+        await goneSet(same);
+        const all = [{col: c, row: r}, ...same].sort((a, b) => b.row - a.row);
+        for (const s of all) stacks[s.col].splice(s.row, 1);
+        chains++;
+        lastC = c; lastR = r;
+        score += MAX_LEVEL * 30;   // 满级消除奖励
+        updateScore();
+        render();
+        for (const s of all){
+          const col = stacks[s.col];
+          for (let rr = s.row; rr < col.length; rr++){
+            const v = col[rr];
+            if (rr > 0 && col[rr-1] === v) queue.add(s.col + ',' + rr);
+            if (s.col > 0 && stacks[s.col-1][rr] === v) queue.add(s.col + ',' + rr);
+            if (s.col < COLS - 1 && stacks[s.col+1][rr] === v) queue.add(s.col + ',' + rr);
+          }
+        }
+        beep(880, 0.18, 'square', 0.1);
+        await sleep(320);
+        continue;
+      }
+      const nl = nlRaw;
       // 1) 预备：所有参与方块碰撞闪烁
-      await flashSet(lastCol, lastRow, same);
+      await flashSet(c, r, same);
       // 2) 被吸收的方块缩小消失
       await goneSet(same);
       // 3) 应用合并：先删被吸收的（同列从高 row 往下删，避免索引错乱）
-      const below = same.filter(s => s.col === lastCol && s.row < lastRow).length;
+      const below = same.filter(s => s.col === c && s.row < r).length;
       const sorted = [...same].sort((a, b) => b.row - a.row);
       for (const s of sorted){
         stacks[s.col].splice(s.row, 1);
       }
-      const newRow = lastRow - below;   // 删除下方方块后，结果位置上移
-      stacks[lastCol][newRow] = nl;
-      lastRow = newRow;
+      const newRow = r - below;   // 删除下方方块后，结果位置上移
+      stacks[c][newRow] = nl;
       chains++;
+      lastC = c; lastR = newRow;
       render();
-      // 下移检测：splice 后受影响列上方方块下移，若与"新邻居"（下/左/右）相同则继续连锁
-      // （修复：3 被吃掉后 2 掉到底部，与旁边列的 2 同行相邻——按直觉应该合）
-      const cascade = findCascade(sorted);
-      if (cascade){
-        lastCol = cascade.col;
-        lastRow = cascade.row;
-        continue;
+      // 4) 入队"升级位置"：升级后的方块可能与其邻居（含同列上下）相同，必须重新检查
+      queue.add(c + ',' + newRow);
+      // 5) 入队"删除位置的下移链"：splice 后受影响列上方方块整体下移，
+      //    从删除位置向上扫，任何与"新邻居"（下/左/右）相同的方块都继续连锁。
+      //    注意：不能遇到第一个匹配就 break——同一列可能有多个下移方块产生新邻居，
+      //    漏掉一个就会留下同列相邻相同的非法状态（2026-08-18 v4.2 实测教训）
+      for (const s of sorted){
+        const col = stacks[s.col];
+        for (let rr = s.row; rr < col.length; rr++){
+          const v = col[rr];
+          if (rr > 0 && col[rr-1] === v) queue.add(s.col + ',' + rr);
+          if (s.col > 0 && stacks[s.col-1][rr] === v) queue.add(s.col + ',' + rr);
+          if (s.col < COLS - 1 && stacks[s.col+1][rr] === v) queue.add(s.col + ',' + rr);
+        }
       }
-      // 4) 新数字弹出动画 + 合成音
-      const tiles = colsEl.children[lastCol].querySelectorAll('.stack .tile');
-      const el = tiles[lastRow];
+      // 6) 新数字弹出动画 + 合成音
+      const tiles = colsEl.children[c].querySelectorAll('.stack .tile');
+      const el = tiles[newRow];
       if (el){
         el.classList.add('merge-pop');
         setTimeout(() => el.classList.remove('merge-pop'), 500);
@@ -778,10 +811,11 @@
     score += gain;
     updateScore();
 
-    const colEl = colsEl.children[lastCol];
+    if (lastC < 0) lastC = 0, lastR = 0;
+    const colEl = colsEl.children[lastC];
     const tiles = colEl.querySelectorAll('.stack .tile');
-    const result = tiles[lastRow];
-    spawnFX(lastCol, topLevel, chains, result);
+    const result = tiles[lastR] || null;
+    spawnFX(lastC, topLevel, chains, result);
 
     // 连锁结束的升调音效
     if (chains > 1) beep(420 + topLevel * 45 * 1.5, 0.16, 'sine', 0.11, 0.07);
