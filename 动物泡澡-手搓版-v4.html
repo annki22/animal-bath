@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.8.1</title>
-<!-- v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
+<title>动物泡澡 · 手搓版 v4.8.2</title>
+<!-- v4.8.2：max_level 每局就地更新（不等破纪录）+ 排行榜最大合成列去"合"字；v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -334,8 +334,7 @@
   .rank-row:nth-child(3) .rank-no { color: #C88F5A; }
   .rank-name { flex: 1; font-weight: 600; color: #2F3542; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rank-score { font-weight: 800; color: #2F3542; font-variant-numeric: tabular-nums; }
-  .rank-max { font-size: 11px; color: #9AA0A8; margin-left: 8px; white-space: nowrap; }
-  .rank-max b { color: #F08C2E; }
+  .rank-max { font-size: 13px; font-weight: 800; color: #F08C2E; margin-left: 10px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .rank-empty { color: #9AA0A8; font-size: 13px; padding: 20px 0; }
   .rank-mine { font-size: 12px; color: #9AA0A8; margin-bottom: 10px; }
   .rank-loading { color: #9AA0A8; font-size: 13px; padding: 24px 0; }
@@ -344,7 +343,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.1</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.2</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -401,7 +400,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.8.1 · 六列 · 警戒线结束 · 皇冠排行</div>
+      <div class="ver">v4.8.2 · 六列 · 警戒线结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -1043,9 +1042,21 @@ const EMOJI_IMGS = [
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
     try {
-      const r = await sbFetch('scores?select=score&nickname=eq.' + encodeURIComponent(nickname) + '&order=score.desc&limit=1', { signal: ctrl.signal });
+      const r = await sbFetch('scores?select=score,max_level&nickname=eq.' + encodeURIComponent(nickname) + '&order=score.desc&limit=1', { signal: ctrl.signal });
       const rows = await r.json();
-      if (Array.isArray(rows) && rows.length && rows[0].score >= score) return true;   // 已有更高分，无需重复提交
+      if (Array.isArray(rows) && rows.length && rows[0].score >= score){
+        // v4.8.2: 分数不更高，但本局最大合成可能更大 → 就地更新最高纪录行的 max_level
+        const oldMax = rows[0].max_level || 1;
+        if (maxLevel > oldMax){
+          await sbFetch('scores?nickname=eq.' + encodeURIComponent(nickname) + '&score=eq.' + rows[0].score, {
+            method: 'PATCH',
+            headers: { 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ max_level: maxLevel }),
+            signal: ctrl.signal
+          });
+        }
+        return true;
+      }
       const p = await sbFetch('scores', {
         method: 'POST',
         headers: { 'Prefer': 'return=minimal' },
@@ -1115,7 +1126,7 @@ const EMOJI_IMGS = [
       } else {
         rankList.style.display = 'block';
         rankList.innerHTML = list.map((row, i) =>
-          '<div class="rank-row' + (row.nickname === nickname ? ' me' : '') + '"><span class="rank-no">' + (i < 3 ? '👑' : '') + (i + 1) + '</span><span class="rank-name">' + escapeHtml(row.nickname) + '</span><span class="rank-score">' + row.score.toLocaleString() + '</span><span class="rank-max">合<b>' + (row.maxLevel || 1) + '</b></span></div>'
+          '<div class="rank-row' + (row.nickname === nickname ? ' me' : '') + '"><span class="rank-no">' + (i < 3 ? '👑' : '') + (i + 1) + '</span><span class="rank-name">' + escapeHtml(row.nickname) + '</span><span class="rank-score">' + row.score.toLocaleString() + '</span><span class="rank-max">' + (row.maxLevel || 1) + '</span></div>'
         ).join('');
       }
       if (mine){
