@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>动物泡澡 · 手搓版 v4.8</title>
-<!-- v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
+<title>动物泡澡 · 手搓版 v4.8.1</title>
+<!-- v4.8.1：修复排行榜加载失败（旧表无 max_level 列时查询降级）；v4.8：六列棋盘 + 触达警戒线直接结束 + 排行榜皇冠/最大合成/直显排名 + 合成动画升级；v4.7：去掉BGM只留音效；v4.6：底部按钮两行布局修复；v4：新增昵称登录、云端排行榜（Supabase）、本局续玩（本地+云端存档） -->
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
@@ -344,7 +344,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v4.8.1</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -401,7 +401,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver">v4.8 · 六列 · 警戒线结束 · 皇冠排行</div>
+      <div class="ver">v4.8.1 · 六列 · 警戒线结束 · 皇冠排行</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <button class="btn" id="nameStart">开始游戏</button>
       <button class="btn ghost" id="nameContinue" style="display:none">继续上一局</button>
@@ -1070,8 +1070,18 @@ const EMOJI_IMGS = [
 
   // 拉取排行榜：同名取最高分，Top 20 + 我的排名 + 总人数
   async function fetchBoardList(){
-    const r = await sbFetch('scores?select=nickname,score,max_level&order=score.desc&limit=200');
-    const rows = await r.json();
+    // v4.8.1 修复：旧表没有 max_level 列时带列查询会报错 → 降级只查基础字段
+    let rows = null;
+    try {
+      const r = await sbFetch('scores?select=nickname,score,max_level&order=score.desc&limit=200');
+      const j = await r.json();
+      if (Array.isArray(j)) rows = j;
+    } catch (e) {}
+    if (!rows){
+      const r = await sbFetch('scores?select=nickname,score&order=score.desc&limit=200');
+      const j = await r.json();
+      if (Array.isArray(j)) rows = j;
+    }
     if (!Array.isArray(rows)) return { list: [], mine: null, total: 0 };
     const map = new Map();
     for (const row of rows){
