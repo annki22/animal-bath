@@ -119,9 +119,27 @@
       </table>
     </div>
 
+    <div class="card" id="eventsCard" style="display:none">
+      <h3>埋点洞察<small id="evHint">events 表 · 发布 v5.4 后开始采集</small></h3>
+      <div class="kpis evkpis" id="evKpis"></div>
+      <div class="grid2">
+        <div class="card" style="margin:0">
+          <h3>留存<small>按首次开局日分群 · 回访率</small></h3>
+          <table id="retTable">
+            <thead><tr><th>首玩日</th><th class="num">玩家</th><th class="num">次日</th><th class="num">3 日</th><th class="num">7 日</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card" style="margin:0">
+          <h3>局内行为</h3>
+          <div id="evBehavior" style="font-size:13px;line-height:2;color:var(--ink)"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="hint">
       <b>口径说明</b> · 活跃=当天有结算上榜或更新存档的去重昵称数；局数=结算上榜次数（中途退出/未上榜的局暂不计）；新玩家=首次上榜日期；最高合成=max_level。<br>
-      数据来自 Supabase <b>scores</b> 与 <b>saves</b> 两表，页面打开时拉取一次。
+      数据来自 Supabase <b>scores</b> 与 <b>saves</b> 两表，页面打开时拉取一次；埋点洞察来自 <b>events</b> 表（RPC 聚合，仅数字不暴露明细）。
     </div>
   </div>
 </div>
@@ -173,6 +191,17 @@
       from += 1000;
     }
     return rows;
+  }
+
+  // 调 events_agg RPC（security definer，只返回聚合数字；表本身拒绝匿名 select）
+  async function fetchEventsAgg() {
+    const r = await fetch(`${API}/rpc/events_agg`, {
+      method: 'POST',
+      headers: { ...HDR, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ days: 14 })
+    });
+    if (!r.ok) throw new Error('events_agg HTTP ' + r.status);
+    return await r.json();
   }
 
   const localDay = d => {
@@ -240,6 +269,62 @@
       if (v > 0 && labels[i].length <= 4) out += `<text x="${bx + bw * 0.32}" y="${T + ih - bh - 4}" class="lbl" text-anchor="middle">${v}</text>`;
     });
     el.innerHTML = out;
+  }
+
+  // ---------- 埋点洞察（第二期，events 表 RPC 聚合） ----------
+  function renderEvents(agg) {
+    const card = $('eventsCard');
+    if (!agg || !agg.total || agg.total === 0) {
+      // 无数据：显示空态提示，不铺骨架
+      card.style.display = 'block';
+      $('evKpis').innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px">暂无埋点数据 — 发布 v5.4 后游戏开始上报，次日可见。</div>`;
+      $('retTable').querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:var(--sub)">等待数据积累…</td></tr>`;
+      $('evBehavior').innerHTML = '等待数据积累…';
+      return;
+    }
+    card.style.display = 'block';
+
+    // 局均用时
+    const dur = agg.durationAvg ? Number(agg.durationAvg) : null;
+    const durTxt = dur == null ? '—' : dur >= 60 ? `${Math.floor(dur / 60)}m${String(Math.round(dur % 60)).padStart(2, '0')}s` : `${dur}s`;
+
+    // 道具使用（撤回/整理）
+    const undo = (agg.powerUse && agg.powerUse.undo) || 0;
+    const reorg = (agg.powerUse && agg.powerUse.reorg) || 0;
+    const powerTotal = undo + reorg;
+
+    // 结束原因（当前只有 overflow=越线）
+    const reason = agg.endReason || {};
+    const reasonTotal = Object.values(reason).reduce((a, b) => a + b, 0);
+    const overflowPct = reasonTotal ? Math.round(100 * ((reason.overflow || 0) / reasonTotal)) : null;
+
+    const kpis = [
+      { label: '埋点事件', num: agg.total, extra: '累计条数' },
+      { label: '局均用时', num: durTxt, extra: '越线结算局' },
+      { label: '道具使用', num: powerTotal, extra: `撤回 ${undo} · 整理 ${reorg}` },
+      { label: '越线结束', num: overflowPct == null ? '—' : overflowPct + '%', extra: '唯一结束方式' },
+    ];
+    $('evKpis').innerHTML = kpis.map(k =>
+      `<div class="kpi"><div class="label">${k.label}</div><div class="num">${k.num}</div><div class="extra">${k.extra}</div></div>`
+    ).join('');
+
+    // 留存表：cohort(首玩日) / 玩家数 / D+1 / D+3 / D+7 回访率
+    const ret = agg.retention || [];
+    const pct = (n, tot) => tot ? Math.round(100 * n / tot) + '%' : '—';
+    $('retTable').querySelector('tbody').innerHTML = ret.length ? ret.map(r =>
+      `<tr><td>${r.cohort}</td><td class="num">${r.players}</td><td class="num">${pct(r.d1, r.players)}</td><td class="num">${pct(r.d3, r.players)}</td><td class="num">${pct(r.d7, r.players)}</td></tr>`
+    ).join('') : `<tr><td colspan="5" style="color:var(--sub)">等待数据积累…</td></tr>`;
+
+    // 局内行为明细
+    const reasonLines = Object.entries(reason).map(([k, v]) => {
+      const label = k === 'overflow' ? '越线' : k;
+      return `${label} ${v} 局${reasonTotal ? '（' + Math.round(100 * v / reasonTotal) + '%）' : ''}`;
+    }).join('<br>') || '暂无';
+    $('evBehavior').innerHTML = `
+      <div><b>道具使用</b> 撤回 ${undo} 次 · 整理 ${reorg} 次</div>
+      <div><b>结束方式</b><br>${reasonLines}</div>
+      <div style="color:var(--sub);font-size:11px;margin-top:6px">样本 ${agg.total} 条事件 · 覆盖 ${(agg.byDay || []).length} 天</div>
+    `;
   }
 
   async function main() {
@@ -325,6 +410,17 @@
         `<tr><td class="rank">${medals[i] || i + 1}</td><td>${nick}</td><td class="num">${b.games}</td><td class="num">${fmt(b.score)}</td><td class="num">${b.max_level}</td><td class="num">${b.last}</td></tr>`
       ).join('');
       $('subLine').textContent = `scores ${scores.length} 条 · saves ${saves.length} 条 · 本地聚合`;
+
+      // ---------- 埋点洞察（独立容错，RPC 未建/失败不影响主看板） ----------
+      try {
+        const agg = await fetchEventsAgg();
+        renderEvents(agg);
+      } catch (err) {
+        $('eventsCard').style.display = 'block';
+        $('evKpis').innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px">埋点聚合暂不可用（${err.message}）— 若已建 RPC 请刷新；未建则不影响其他数据。</div>`;
+        $('retTable').querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:var(--sub)">—</td></tr>`;
+        $('evBehavior').innerHTML = '—';
+      }
     } catch (e) {
       $('state').innerHTML = `<div class="err">数据加载失败：${e.message}<br><br>请确认网络可访问 supabase.co，或稍后重试。</div>`;
     }
