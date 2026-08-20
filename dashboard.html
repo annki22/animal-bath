@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>动物泡澡 · 数据看板</title>
+<style>
+  :root{
+    --bg:#F5F5F7; --card:#FFFFFF; --ink:#1D1D1F; --sub:#86868B; --line:#E8E8ED;
+    --accent:#0071E3; --accent2:#5E5CE6; --accent3:#34C759;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;padding:28px 20px 60px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto}
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px}
+  h1{font-size:22px;font-weight:700;letter-spacing:-0.02em}
+  .sub{font-size:12px;color:var(--sub);font-weight:500}
+  #updateTime{font-size:12px;color:var(--sub);font-weight:500}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .kpi{background:var(--card);border-radius:16px;padding:16px 18px}
+  .kpi .label{font-size:12px;color:var(--sub);font-weight:500;margin-bottom:6px}
+  .kpi .num{font-size:30px;font-weight:700;letter-spacing:-0.03em;line-height:1.1}
+  .kpi .extra{font-size:11px;color:var(--sub);font-weight:500;margin-top:4px}
+
+  .card{background:var(--card);border-radius:16px;padding:20px 22px;margin-bottom:14px}
+  .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
+  .card h3 small{font-weight:500;color:var(--sub);font-size:11px;margin-left:8px}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+
+  svg{display:block;width:100%;height:auto}
+  .axis{stroke:var(--line);stroke-width:1}
+  .gridl{stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+  .lbl{font-size:10px;fill:var(--sub);font-weight:500}
+  .lineA{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+  .lineB{fill:none;stroke:var(--accent2);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+  .dotA{fill:var(--accent)}
+  .bar{fill:var(--accent);rx:3}
+  .bar2{fill:var(--accent2);rx:3}
+  .legend{display:flex;gap:16px;font-size:11px;color:var(--sub);font-weight:500;margin-top:-6px;margin-bottom:10px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{font-size:11px;color:var(--sub);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:9px 10px;border-bottom:1px solid var(--line);font-weight:500}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  th.num{text-align:right}
+  tr:last-child td{border-bottom:none}
+  .rank{color:var(--sub);font-weight:600}
+
+  .hint{font-size:11px;color:var(--sub);line-height:1.7;margin-top:14px}
+  .hint b{color:var(--ink);font-weight:600}
+
+  /* 加载/错误态 */
+  #state{padding:60px 0;text-align:center;color:var(--sub);font-size:14px;font-weight:500}
+  .err{color:#D70015}
+
+  /* 访问口令 */
+  #lock{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:99}
+  .lockcard{background:var(--card);border-radius:20px;padding:36px 40px;width:320px;text-align:center}
+  .lockcard h2{font-size:18px;font-weight:700;margin-bottom:6px}
+  .lockcard p{font-size:12px;color:var(--sub);margin-bottom:20px}
+  .lockcard input{width:100%;height:42px;border:1px solid var(--line);border-radius:12px;padding:0 14px;font-size:15px;font-family:inherit;text-align:center;outline:none;background:#fff;color:var(--ink)}
+  .lockcard input:focus{border-color:var(--accent)}
+  .lockcard .btn{width:100%;height:42px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;font-family:inherit;margin-top:10px;cursor:pointer}
+  .lockcard .btn:active{opacity:.85}
+  .lockerr{font-size:11px;color:#D70015;margin-top:8px;min-height:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>动物泡澡 · 数据看板</h1>
+      <div class="sub" id="subLine">基于排行榜与存档数据 · 本地聚合</div>
+    </div>
+    <div id="updateTime">—</div>
+  </header>
+
+  <div id="lock">
+    <div class="lockcard">
+      <h2>动物泡澡 · 数据看板</h2>
+      <p>请输入访问口令</p>
+      <input id="lockInput" type="password" placeholder="口令" autocomplete="off">
+      <button class="btn" id="lockBtn">进入</button>
+      <div class="lockerr" id="lockErr"></div>
+    </div>
+  </div>
+
+  <div id="state">数据加载中…</div>
+
+  <div id="content" style="display:none">
+    <section class="kpis" id="kpis"></section>
+
+    <div class="card">
+      <h3>近 14 天活跃与局数<small>按昵称去重 · 上海时区</small></h3>
+      <div class="legend"><span><i style="background:var(--accent)"></i>活跃人数</span><span><i style="background:var(--accent2)"></i>局数</span></div>
+      <svg id="chartTrend" viewBox="0 0 920 220" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>单局得分分布</h3>
+        <svg id="chartScore" viewBox="0 0 440 200" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="card">
+        <h3>最高合成等级分布</h3>
+        <svg id="chartLevel" viewBox="0 0 440 200" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>玩家榜<small>按历史最高分</small></h3>
+      <table id="playerTable">
+        <thead><tr><th>#</th><th>昵称</th><th class="num">局数</th><th class="num">最高分</th><th class="num">最高合成</th><th class="num">最近游玩</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="hint">
+      <b>口径说明</b> · 活跃=当天有结算上榜或更新存档的去重昵称数；局数=结算上榜次数（中途退出/未上榜的局暂不计）；新玩家=首次上榜日期；最高合成=max_level。<br>
+      数据来自 Supabase <b>scores</b> 与 <b>saves</b> 两表，页面打开时拉取一次。
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const API = 'https://prlngioyqqonxerssprb.supabase.co/rest/v1';
+  const KEY = 'sb_publishable_ZfjkcGbCOQviUu-uvwwluw_v-Pic-yw';
+  const HDR = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- 访问口令（只给自己看，前端简单校验 + localStorage 记住） ----------
+  const DASH_PASS = 'bath2026';           // ← 想改口令改这里
+  const LOCK_KEY = 'ab_dash_unlock';
+  function unlock() {
+    $('lock').style.display = 'none';
+    $('state').style.display = 'block';
+    main();
+  }
+  (function initLock() {
+    if (localStorage.getItem(LOCK_KEY) === '1') { $('lock').style.display = 'none'; return; }
+    const tryUnlock = () => {
+      if ($('lockInput').value.trim() === DASH_PASS) {
+        localStorage.setItem(LOCK_KEY, '1');
+        $('lock').style.display = 'none';
+        $('state').style.display = 'block';
+        main();
+      } else {
+        $('lockErr').textContent = '口令不对';
+      }
+    };
+    $('lockBtn').addEventListener('click', tryUnlock);
+    $('lockInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+    $('lockInput').focus();
+  })();
+
+  async function fetchAll(table, select, orderCol) {
+    const rows = [];
+    let from = 0;
+    for (;;) {
+      const qs = new URLSearchParams({ select, order: orderCol + '.desc' });
+      const r = await fetch(`${API}/${table}?${qs}`, { headers: { ...HDR, Range: `${from}-${from + 999}` } });
+      if (!r.ok) throw new Error(table + ' HTTP ' + r.status);
+      const batch = await r.json();
+      rows.push(...batch);
+      if (batch.length < 1000) break;
+      from += 1000;
+    }
+    return rows;
+  }
+
+  const localDay = d => {
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  };
+  const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return d; };
+  const fmt = n => n >= 10000 ? (n / 10000).toFixed(1) + 'w' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+
+  function svgLine(points, className) {
+    if (!points.length) return '';
+    return `<polyline class="${className}" points="${points.map(p => p[0] + ',' + p[1]).join(' ')}"/>`;
+  }
+
+  function drawTrend(activeByDay, gamesByDay, days) {
+    const W = 920, H = 220, L = 36, R = 12, T = 14, B = 26;
+    const iw = W - L - R, ih = H - T - B;
+    const actCount = {};
+    for (const d in activeByDay) actCount[d] = activeByDay[d].size;
+    const maxV = Math.max(1, ...Object.values(actCount), ...Object.values(gamesByDay));
+    const y = v => T + ih * (1 - v / maxV);
+    const xs = {};
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = localDay(daysAgo(i));
+      dates.push(d);
+      xs[d] = L + iw * (days - 1 - i) / (days - 1 || 1);
+    }
+    let out = `<line x1="${L}" y1="${T}" x2="${L}" y2="${T + ih}" class="axis"/><line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" class="axis"/>`;
+    for (let g = 0; g <= 3; g++) {
+      const gy = T + ih * g / 3;
+      out += `<line x1="${L}" y1="${gy}" x2="${W - R}" y2="${gy}" class="gridl"/>`;
+      out += `<text x="${L - 6}" y="${gy + 3}" class="lbl" text-anchor="end">${Math.round(maxV * (1 - g / 3))}</text>`;
+    }
+    const step = Math.ceil(days / 8);
+    dates.forEach((d, i) => {
+      if (i % step === 0 || i === dates.length - 1) {
+        const txt = d.slice(5);
+        out += `<text x="${xs[d]}" y="${H - 8}" class="lbl" text-anchor="middle">${txt}</text>`;
+      }
+    });
+    const pa = dates.filter(d => actCount[d] > 0).map(d => [xs[d], y(actCount[d])]);
+    const pb = dates.filter(d => gamesByDay[d] > 0).map(d => [xs[d], y(gamesByDay[d])]);
+    out += svgLine(pa, 'lineA') + svgLine(pb, 'lineB');
+    pa.forEach(p => { out += `<circle cx="${p[0]}" cy="${p[1]}" r="3" class="dotA"/>`; });
+    $('chartTrend').innerHTML = out;
+  }
+
+  function drawBars(values, labels, el, color) {
+    const W = 440, H = 200, L = 34, R = 8, T = 12, B = 26;
+    const iw = W - L - R, ih = H - T - B;
+    const maxV = Math.max(1, ...values);
+    const bw = iw / values.length;
+    let out = `<line x1="${L}" y1="${T}" x2="${L}" y2="${T + ih}" class="axis"/><line x1="${L}" y1="${T + ih}" x2="${W - R}" y2="${T + ih}" class="axis"/>`;
+    for (let g = 0; g <= 3; g++) {
+      const gy = T + ih * g / 3;
+      out += `<line x1="${L}" y1="${gy}" x2="${W - R}" y2="${gy}" class="gridl"/>`;
+      out += `<text x="${L - 6}" y="${gy + 3}" class="lbl" text-anchor="end">${Math.round(maxV * (1 - g / 3))}</text>`;
+    }
+    values.forEach((v, i) => {
+      const bh = v ? Math.max(2, ih * v / maxV) : 0;
+      const bx = L + i * bw + bw * 0.18;
+      out += `<rect x="${bx}" y="${T + ih - bh}" width="${bw * 0.64}" height="${bh}" class="${color}"/>`;
+      out += `<text x="${bx + bw * 0.32}" y="${H - 8}" class="lbl" text-anchor="middle">${labels[i]}</text>`;
+      if (v > 0 && labels[i].length <= 4) out += `<text x="${bx + bw * 0.32}" y="${T + ih - bh - 4}" class="lbl" text-anchor="middle">${v}</text>`;
+    });
+    el.innerHTML = out;
+  }
+
+  async function main() {
+    try {
+      const [scores, saves] = await Promise.all([
+        fetchAll('scores', 'nickname,score,max_level,created_at', 'created_at'),
+        fetchAll('saves', 'nickname,updated_at', 'updated_at')
+      ]);
+      $('state').style.display = 'none';
+      $('content').style.display = 'block';
+      $('updateTime').textContent = '更新于 ' + new Date().toLocaleString('zh-CN', { hour12: false });
+
+      // ---------- 聚合 ----------
+      const today = localDay(new Date());
+      const yesterday = localDay(daysAgo(1));
+
+      const activeSet = {};   // day -> Set(nick)
+      const gamesByDay = {};  // day -> count
+      const firstDay = {};    // nick -> earliest score day
+      const nickBest = {};    // nick -> {score, max_level, games, last}
+      const allDays = new Set();
+
+      const touch = (d, nick) => {
+        const day = localDay(new Date(d));
+        allDays.add(day);
+        (activeSet[day] = activeSet[day] || new Set()).add(nick);
+      };
+
+      for (const s of scores) {
+        touch(s.created_at, s.nickname);
+        gamesByDay[localDay(new Date(s.created_at))] = (gamesByDay[localDay(new Date(s.created_at))] || 0) + 1;
+        if (!(s.nickname in firstDay)) firstDay[s.nickname] = localDay(new Date(s.created_at));
+        const b = nickBest[s.nickname] = nickBest[s.nickname] || { score: 0, max_level: 0, games: 0, last: '' };
+        b.games++;
+        if (s.score > b.score) b.score = s.score;
+        if (s.max_level > b.max_level) b.max_level = s.max_level;
+        const sd = localDay(new Date(s.created_at));
+        if (sd > b.last) b.last = sd;
+      }
+      for (const s of saves) touch(s.updated_at, s.nickname);
+
+      const act = k => (activeSet[k] || new Set()).size;
+      const games = k => gamesByDay[k] || 0;
+
+      // ---------- KPI ----------
+      const weekActive = new Set();
+      for (let i = 0; i < 7; i++) { const d = localDay(daysAgo(i)); (activeSet[d] || new Set()).forEach(n => weekActive.add(n)); }
+      const allActive = new Set(Object.values(activeSet).flatMap(s => [...s]));
+      const newToday = Object.entries(firstDay).filter(([, d]) => d === today).length;
+      const allScores = scores.map(s => s.score);
+      const avgScore = Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length);
+      const maxScore = Math.max(...allScores);
+
+      const kpis = [
+        { label: '今日活跃', num: act(today), extra: '昨日 ' + act(yesterday) },
+        { label: '近 7 日活跃', num: weekActive.size, extra: '去重玩家' },
+        { label: '累计玩家', num: allActive.size, extra: '今日新增 ' + newToday },
+        { label: '累计局数', num: scores.length, extra: '平均 ' + avgScore + ' 分' },
+        { label: '最高分', num: fmt(maxScore), extra: maxScore >= 10000 ? '破万玩家' : '继续冲' },
+      ];
+      $('kpis').innerHTML = kpis.map(k =>
+        `<div class="kpi"><div class="label">${k.label}</div><div class="num">${k.num}</div><div class="extra">${k.extra}</div></div>`
+      ).join('');
+
+      // ---------- 趋势（近14天） ----------
+      drawTrend(activeSet, gamesByDay, 14);
+
+      // ---------- 得分分布 ----------
+      const buckets = [0, 5000, 10000, 20000, 40000, Infinity];
+      const blabels = ['<5k', '5k-1w', '1w-2w', '2w-4w', '4w+'];
+      const bvals = buckets.slice(0, -1).map((b, i) => allScores.filter(s => s >= b && s < buckets[i + 1]).length);
+      drawBars(bvals, blabels, $('chartScore'), 'bar');
+
+      // ---------- 最高合成分布 ----------
+      const lvMax = Math.max(1, ...scores.map(s => s.max_level));
+      const lv = Array.from({ length: lvMax }, (_, i) => scores.filter(s => s.max_level === i + 1).length);
+      drawBars(lv, Array.from({ length: lvMax }, (_, i) => String(i + 1)), $('chartLevel'), 'bar2');
+
+      // ---------- 玩家榜 ----------
+      const sorted = Object.entries(nickBest).sort((a, b) => b[1].score - a[1].score);
+      const medals = ['🥇', '🥈', '🥉'];
+      $('playerTable').querySelector('tbody').innerHTML = sorted.slice(0, 30).map(([nick, b], i) =>
+        `<tr><td class="rank">${medals[i] || i + 1}</td><td>${nick}</td><td class="num">${b.games}</td><td class="num">${fmt(b.score)}</td><td class="num">${b.max_level}</td><td class="num">${b.last}</td></tr>`
+      ).join('');
+      $('subLine').textContent = `scores ${scores.length} 条 · saves ${saves.length} 条 · 本地聚合`;
+    } catch (e) {
+      $('state').innerHTML = `<div class="err">数据加载失败：${e.message}<br><br>请确认网络可访问 supabase.co，或稍后重试。</div>`;
+    }
+  }
+})();
+</script>
+</body>
+</html>
