@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.3</title>
+  <title>动物泡澡 · 手搓版 v5.4</title>
+  <!-- v5.4（2026-08-20）：埋点上报（安琪拍板：看板只给自己看、落子不埋）——页面访问/开局/结束/道具使用/看榜 5 类事件，攒批 5 条或 5 秒 flush 到 Supabase events 表，页面关闭用 fetch keepalive 兜底；看板按事件聚合（埋点洞察：局均用时/道具使用/结束原因/留存），events 表 RLS 只开放匿名 insert、读默认拒绝，聚合走 security definer RPC -->
   <!-- v5.3（2026-08-20）：整理交互优化——电脑端把 3×3 黄框移到目标位置后，鼠标在棋盘上点一下即整理生效（原需移出棋盘点「确认整理」按钮，框跟鼠标走没法同时点按钮）；拖动仍可点按钮确认，移动端流程不变；确认后自动吞掉紧随的 click 防误投 -->
   <!-- v4.9.14：恢复主流掉落手感 + 防堆积补配对（安琪确认的最终规则）——补配对触发改为"某数字数量>4 必补"（限 1-10，11+ 不补）；10效应：棋盘有 10 后 1 不再掉；比例控制 6≤3-5 的 1/3；预览区去闪烁去数字徽标、删泡泡特效、连击得分提高、庆祝文案可爱化 -->
   <!-- v4.9.11：①大数字不再坑人——7-10 只在棋盘已有该值时才会掉（安琪拍板 B，Threes 式跟随棋盘）：首个 7 只能靠合成（6+6 或 5+5+5），合出后才会出现在掉落里；棋盘没有该值时概率自然分给 3-6，掉下来的大数字永远有配对，不再是死块；原"每 25 投解锁一档"节奏删除（顺带消除 100/125 进度不一致）②落子节奏统一 260ms——落子动画 0.34s→0.26s、合成开始 230→260，方块落稳即合成，不再没落稳就闪（安琪拍板 A） -->
@@ -425,7 +426,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.3</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.4</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -477,7 +478,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.3 · 五列 · 越线才结束 · 道具：整理/撤回</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.4 · 五列 · 越线才结束 · 道具：整理/撤回</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <div class="name-err" id="nameErr" style="display:none"></div>
@@ -527,7 +528,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-  const VER = 'v5.3';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修"整理超范围"bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底（1→8%/2→5%，回纯概率，删让位/补配对）+ 整理框选定住（松手/取消/移出不消失，可先框选后确认）+ 整理后撤回保留（清撤销栈，新落子照常可撤，旧档作废）；v5.3: 整理单击即确认（电脑端鼠标点一下棋盘即整理生效）+ 确认后吞 click 防误投，旧档作废
+const VER = 'v5.4';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -909,6 +910,7 @@ const EMOJI_IMGS = [
     updateScore(); render(); renderNext(); fitBoard();
     updatePowerUI();
     saveGame();                    // 撤回也是状态变更，立刻存档
+    trackEvent('power_use', { type: 'undo', left: undoLeft });   // v5.4: 道具埋点
     beep(300, 0.14, 'sine', 0.10); // 撤回音（低柔上行）
   }
 
@@ -1134,6 +1136,7 @@ const EMOJI_IMGS = [
     if (!running || busy) return;
     if (reorgLeft <= 0) return;
     if (!reorgApply(sel)){ beep(150, 0.15, 'square', 0.08); return; }   // 区域无效：保持整理模式可重选
+    trackEvent('power_use', { type: 'reorg', left: reorgLeft - 1 });   // v5.4: 道具埋点（reorgApply 已消耗次数）
     setReorgMode(false);
     busy = true;
     updatePowerUI();
@@ -1410,6 +1413,7 @@ const EMOJI_IMGS = [
     if (over){
       running = false;
       clearSave();   // v4.9: 结束即清存档——否则死后强退再进会"复活"到临终棋盘
+      trackEvent('game_over', { score: score, maxLevel: maxLevel, duration: Math.round((Date.now() - gameStartTs) / 1000), reason: 'overflow' });   // v5.4: 结算埋点（越线结束）
       if (score > best){
         best = score;
         try { localStorage.setItem('animalBathBest', String(best)); } catch (e) { /* 忽略：无法保存最高分不影响游玩 */ }
@@ -1433,6 +1437,64 @@ const EMOJI_IMGS = [
     const headers = Object.assign({}, SB_HEADERS, opts.headers || {});
     return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, opts, { headers: headers }));
   }
+
+  // ===== 数据埋点 tracker（v5.4 起，安琪拍板：看板只给自己看、落子不埋） =====
+  // 事件：page_view / game_start / game_over / power_use / rank_view
+  // 规则：队列批量提交（攒 5 条或 5 秒 flush 一次）；页面关闭 fetch keepalive 兜底（sendBeacon 带不了 apikey 头，用 keepalive 替代）；
+  //       session_id 存 localStorage，30 分钟无操作生成新会话；所有失败静默，绝不影响游玩。
+  let evtQueue = [];
+  let evtTimer = null;
+  let gameStartTs = 0;   // 本局开始时间戳（game_over 算用时）
+
+  function evtSessionId(){
+    const now = Date.now();
+    try {
+      const raw = localStorage.getItem('animalBathSession');
+      if (raw){
+        const s = JSON.parse(raw);
+        if (now - s.t < 30 * 60 * 1000){ s.t = now; localStorage.setItem('animalBathSession', JSON.stringify(s)); return s.id; }
+      }
+    } catch (e) {}
+    const s = { id: Math.random().toString(36).slice(2) + now.toString(36), t: now };
+    try { localStorage.setItem('animalBathSession', JSON.stringify(s)); } catch (e) {}
+    return s.id;
+  }
+
+  function evtFlush(){
+    if (!evtQueue.length) return;
+    const batch = evtQueue;
+    evtQueue = [];
+    if (evtTimer){ clearTimeout(evtTimer); evtTimer = null; }
+    try {
+      fetch(SUPABASE_URL + '/rest/v1/events', {
+        method: 'POST',
+        headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(batch)
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  function trackEvent(event, payload){
+    try {
+      evtQueue.push({ event: event, nickname: nickname || '', session_id: evtSessionId(), payload: payload || null });
+      if (evtQueue.length >= 5){ evtFlush(); return; }
+      if (!evtTimer) evtTimer = setTimeout(evtFlush, 5000);
+    } catch (e) {}
+  }
+
+  // 页面关闭/隐藏：keepalive 兜底最后一批（带 apikey 头，sendBeacon 做不到）
+  window.addEventListener('pagehide', () => {
+    if (!evtQueue.length) return;
+    try {
+      const batch = evtQueue; evtQueue = [];
+      fetch(SUPABASE_URL + '/rest/v1/events', {
+        method: 'POST',
+        headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(batch),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  });
 
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
   function saveGame(){
@@ -1539,6 +1601,8 @@ const EMOJI_IMGS = [
     updateScore();
     render(); renderNext(); fitBoard();
     hideNameOverlay();
+    gameStartTs = Date.now();
+    trackEvent('game_start', { continue: true });   // v5.4: 续玩埋点
   }
 
   // 新开一局（清除旧存档）
@@ -1546,6 +1610,8 @@ const EMOJI_IMGS = [
     clearSave();
     init();
     hideNameOverlay();
+    gameStartTs = Date.now();
+    trackEvent('game_start', { continue: false });   // v5.4: 新局埋点
   }
 
   // 结算：提交分数到排行榜（同名已有更高分则跳过）。返回是否成功
@@ -1629,6 +1695,7 @@ const EMOJI_IMGS = [
   // 展示排行榜。fromGame=true 表示结算直显：顶部显示本局名次 + 超越人数，关闭后自动开新局
   async function showRank(fromGame){
     afterGameRank = !!fromGame;
+    if (!fromGame) trackEvent('rank_view', {});   // v5.4: 手动看榜埋点（结算直显不重复计）
     rankOverlay.classList.add('show');
     rankLoading.style.display = 'block';
     rankList.style.display = 'none';
@@ -1802,6 +1869,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.4', '开启数据上报：页面、开局、结束、道具、看榜都会记录，方便在数据看板看大家怎么玩；记录的数据只用于看板聚合，不公开'],
     ['v5.3', '整理更顺手：电脑端把框移到位置，点一下棋盘就整理生效，不用再移出去点确认'],
     ['v5.2', '掉落手感优化,后期小数字不断供;整理框选更顺手,撤回更灵活'],
     ['v5.1', '小版本优化：整理交互更顺手，整体更流畅'],
@@ -1947,6 +2015,7 @@ const EMOJI_IMGS = [
   //  拖拽中移出棋盘框停最后位置,移回棋盘 pointermove 继续跟随;确认/取消由 setReorgMode 统一清理
 
   showNameOverlay();   // 启动：先登录昵称（有存档可继续上一局）
+  trackEvent('page_view', { ua: (navigator.userAgent || '').slice(0, 120) });   // v5.4: 页面访问埋点（放最后确保 DOM 就绪）
 })();
 </script>
 </body>
