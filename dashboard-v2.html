@@ -162,7 +162,12 @@
     main();
   }
   (function initLock() {
-    if (localStorage.getItem(LOCK_KEY) === '1') { $('lock').style.display = 'none'; return; }
+    if (localStorage.getItem(LOCK_KEY) === '1') {
+      $('lock').style.display = 'none';
+      $('state').style.display = 'block';
+      main();          // 已解锁也必须启动加载——否则永远卡「数据加载中…」
+      return;
+    }
     const tryUnlock = () => {
       if ($('lockInput').value.trim() === DASH_PASS) {
         localStorage.setItem(LOCK_KEY, '1');
