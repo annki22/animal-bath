@@ -26,9 +26,10 @@
   .card{background:var(--card);border-radius:16px;padding:20px 22px;margin-bottom:14px}
   .card h3{font-size:14px;font-weight:600;margin-bottom:14px}
   .card h3 small{font-weight:500;color:var(--sub);font-size:11px;margin-left:8px}
-
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+  .evkpis{grid-template-columns:repeat(4,1fr)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+  @media(max-width:720px){.kpis{grid-template-columns:repeat(2,1fr)}.evkpis{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 
   svg{display:block;width:100%;height:auto}
   .axis{stroke:var(--line);stroke-width:1}
@@ -120,7 +121,7 @@
     </div>
 
     <div class="card" id="eventsCard" style="display:none">
-      <h3>埋点洞察<small id="evHint">events 表 · 发布 v5.4 后开始采集</small></h3>
+      <h3>埋点洞察<small id="evHint">events 表 · 发布 v5.5 后开始采集</small></h3>
       <div class="kpis evkpis" id="evKpis"></div>
       <div class="grid2">
         <div class="card" style="margin:0">
@@ -288,7 +289,7 @@
     if (!agg || !agg.total || agg.total === 0) {
       // 无数据：显示空态提示，不铺骨架
       card.style.display = 'block';
-      $('evKpis').innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px">暂无埋点数据 — 发布 v5.4 后游戏开始上报，次日可见。</div>`;
+      $('evKpis').innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px">暂无埋点数据 — 发布 v5.5 后游戏开始上报，次日可见。</div>`;
       $('retTable').querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:var(--sub)">等待数据积累…</td></tr>`;
       $('evBehavior').innerHTML = '等待数据积累…';
       return;
@@ -309,7 +310,13 @@
     const reasonTotal = Object.values(reason).reduce((a, b) => a + b, 0);
     const overflowPct = reasonTotal ? Math.round(100 * ((reason.overflow || 0) / reasonTotal)) : null;
 
+    // 今日进来（login 去重昵称，含没打完的；RPC 旧版无 loginPlayers 字段时显示 —）
+    const todayStr = localDay(new Date());
+    const todayRow = (agg.byDay || []).find(r => r.day === todayStr);
+    const loginToday = todayRow ? (todayRow.loginPlayers == null ? null : todayRow.loginPlayers) : null;
+
     const kpis = [
+      { label: '今日进来', num: loginToday == null ? '—' : loginToday, extra: '输入昵称即计，含未打完' },
       { label: '埋点事件', num: agg.total, extra: '累计条数' },
       { label: '局均用时', num: durTxt, extra: '越线结算局' },
       { label: '道具使用', num: powerTotal, extra: `撤回 ${undo} · 整理 ${reorg}` },
@@ -414,6 +421,16 @@
       const lv = Array.from({ length: lvMax }, (_, i) => scores.filter(s => s.max_level === i + 1).length);
       drawBars(lv, Array.from({ length: lvMax }, (_, i) => String(i + 1)), $('chartLevel'), 'bar2');
 
+      // ---------- 最近游玩修正（v5.5：RPC players = 最近活动日，覆盖 scores 首次上榜结算日） ----------
+      let agg = null;
+      try { agg = await fetchEventsAgg(); } catch (e) { agg = null; }
+      if (agg && agg.players) {
+        for (const [nick, day] of Object.entries(agg.players)) {
+          const b = nickBest[nick];
+          if (b && day > b.last) b.last = day;
+        }
+      }
+
       // ---------- 玩家榜 ----------
       const sorted = Object.entries(nickBest).sort((a, b) => b[1].score - a[1].score);
       const medals = ['🥇', '🥈', '🥉'];
@@ -424,7 +441,7 @@
 
       // ---------- 埋点洞察（独立容错，RPC 未建/失败不影响主看板） ----------
       try {
-        const agg = await fetchEventsAgg();
+        if (!agg) agg = await fetchEventsAgg();
         renderEvents(agg);
       } catch (err) {
         $('eventsCard').style.display = 'block';
