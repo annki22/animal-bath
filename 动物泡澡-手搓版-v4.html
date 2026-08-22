@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.7</title>
+  <title>动物泡澡 · 手搓版 v5.8</title>
+<!-- v5.8（2026-08-23）：登录优化——①起名查重不堵门口：先进游戏、后台查、撞名再弹窗提醒（本人确认继续/换名，同设备锁定不变）②所有云端请求 8 秒超时兜底：国内网络下 Supabase 偶发挂起不再无限卡死（看板 8/20 同款修复）③查重两次查询改并行 -->
 <!-- v5.7（2026-08-22）：新设备起名撞名软提醒——不再硬拦，弹窗问"可能与别人ID重复，是否要更改？"，本人确认可不更改直接生效（同设备锁定昵称仍不可改、保持不变），非本人可换名；VERSIONS 更新说明润色+补日期 -->
 <!-- v5.6（2026-08-22）：①起名查重整体移除（用户拍板）——v4.9.6 的 isNameTaken 不再拦同名/占用，登录即时通过；设备锁定（localStorage 已有昵称即只读，同一设备默认同一 ID）保留 ②VERSIONS 更新说明全面简化为通用话术（不再向玩家罗列内部改动/监控细节） -->
   <!-- v5.5（2026-08-22）：login 埋点（名片确认即记，5 类→6 类事件）+ 看板「今日进来」KPI + 「最近游玩」改 events 最近活动日（RPC players 覆盖 scores 首次上榜结算日）——v5.5 起游戏侧在 onNameStart/onNameContinue 名片确认后上报 login{action:'new'/'continue'}；看板按 login 事件去重昵称展示当日进入人数；events 表 RLS 只开放匿名 insert、读默认拒绝，聚合走 security definer RPC -->
@@ -429,7 +430,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.7</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.8</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -481,7 +482,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.7 · 五列 · 越线才结束 · 道具：整理/撤回</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.8 · 五列 · 越线才结束 · 道具：整理/撤回</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -541,7 +542,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.7';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废
+const VER = 'v5.8';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -1449,7 +1450,13 @@ const EMOJI_IMGS = [
     opts = opts || {};
     // 注意：必须合并 headers，不能覆盖——POST 时传的 Prefer 会丢掉 apikey 导致 401
     const headers = Object.assign({}, SB_HEADERS, opts.headers || {});
-    return fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, opts, { headers: headers }));
+    // v5.8: 所有 Supabase 请求 8 秒超时兜底（AbortController）——国内网络下 Supabase 偶发连接抖动/SSL 中断，
+    //       fetch 挂起既不 resolve 也不 reject（看板 8/20 实测同款），无超时会把后续请求/交互全拖住
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const p = fetch(SUPABASE_URL + '/rest/v1/' + path, Object.assign({}, opts, { headers: headers, signal: ctrl.signal }));
+    p.then(() => clearTimeout(timer), () => clearTimeout(timer));
+    return p;
   }
 
   // ===== 数据埋点 tracker（v5.4 起，安琪拍板：看板只给自己看、落子不埋） =====
@@ -1480,7 +1487,7 @@ const EMOJI_IMGS = [
     evtQueue = [];
     if (evtTimer){ clearTimeout(evtTimer); evtTimer = null; }
     try {
-      fetch(SUPABASE_URL + '/rest/v1/events', {
+      sbFetch('events', {   // v5.8: 走 sbFetch 统一拿 8s 超时，防埋点挂起占连接
         method: 'POST',
         headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
         body: JSON.stringify(batch)
@@ -1782,25 +1789,36 @@ const EMOJI_IMGS = [
   function hideNameOverlay(){ nameOverlay.classList.remove('show'); }
 
   let nameBusy = false;   // 查重进行中防连点重复提交
-  let dupName = '';       // 弹窗挂起时的候选昵称
 
   // v5.7: 软查重——scores+saves 两表忽略大小写查，重复则弹窗让用户自决（本人确认继续/非本人换名），不再硬拦截
   // 查询失败（断网等）放行：不因为后端问题把玩家挡在门外
+  // v5.8: 两次查询改并行（Promise.all），省一半等待
   async function isNameTaken(name){
     try {
       // ilike 值不加引号——PostgREST 对引号包裹的 percent-encoded 中文匹配失败（v4.9.6 实测）
       const enc = encodeURIComponent(name);
-      const r1 = await sbFetch('scores?select=nickname&nickname=ilike.' + enc + '&limit=1');
+      const [r1, r2] = await Promise.all([
+        sbFetch('scores?select=nickname&nickname=ilike.' + enc + '&limit=1'),
+        sbFetch('saves?select=nickname&nickname=ilike.' + enc + '&limit=1')
+      ]);
       const a = await r1.json();
-      if (Array.isArray(a) && a.length) return true;
-      const r2 = await sbFetch('saves?select=nickname&nickname=ilike.' + enc + '&limit=1');
       const b = await r2.json();
-      return Array.isArray(b) && b.length;
+      return (Array.isArray(a) && a.length) || (Array.isArray(b) && b.length);
     } catch (e) { return false; }
   }
 
+  // v5.8: 进游戏后后台查重——不堵门口（先进先玩），撞名再弹窗提醒（软提醒本质：提醒不拦截）
+  async function checkDupAsync(name){
+    nameBusy = true;
+    try {
+      const taken = await isNameTaken(name);
+      if (taken) showDupOverlay(name);
+    } catch (e) {} finally {
+      nameBusy = false;
+    }
+  }
+
   function showDupOverlay(name){
-    dupName = name;
     dupOverlay.classList.add('show');
   }
   function hideDupOverlay(){ dupOverlay.classList.remove('show'); }
@@ -1813,17 +1831,13 @@ const EMOJI_IMGS = [
     startNewGame();
   }
 
-  async function onNameStart(){
+  function onNameStart(){
     const name = (nameInput.value || '').trim().slice(0, 12);
     if (!name){ nameInput.focus(); return; }
     if (nameBusy) return;
-    if (name !== nickname){   // 名字变了（新设备起名/未锁定设备换名）→ 软查重；锁定设备名字恒不变直接跳过
-      nameBusy = true;
-      const taken = await isNameTaken(name);
-      nameBusy = false;
-      if (taken){ showDupOverlay(name); return; }   // 软提醒：本人确认继续 / 非本人换名
-    }
-    enterGame(name);
+    const needCheck = (name !== nickname);   // 名字变了（新设备起名/未锁定设备换名）→ 后台软查重；锁定设备名字恒不变直接跳过
+    enterGame(name);                          // v5.8: 先秒进游戏，查重不阻塞
+    if (needCheck) checkDupAsync(name);
   }
 
   async function onNameContinue(){
@@ -1886,6 +1900,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.8',  '2026-08-23', '登录更顺畅：进游戏不再等待，撞名会提醒；网络波动时也不卡顿'],
     ['v5.7',  '2026-08-22', '起名更贴心：新设备遇到重名会提醒，可确认继续或换个昵称'],
     ['v5.6',  '2026-08-22', '起名更自由：重名也能用，不再被拦'],
     ['v5.5',  '2026-08-22', '埋点系统更新'],
@@ -1945,8 +1960,17 @@ const EMOJI_IMGS = [
   nameStart.addEventListener('click', onNameStart);
   nameContinue.addEventListener('click', onNameContinue);
   nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') onNameStart(); });
-  document.getElementById('dupKeep').addEventListener('click', () => { hideDupOverlay(); enterGame(dupName); });   // v5.7: 本人确认继续
-  document.getElementById('dupChange').addEventListener('click', () => { hideDupOverlay(); nameInput.value = ''; try { nameInput.focus(); } catch (e) {} });   // v5.7: 非本人换名
+  document.getElementById('dupKeep').addEventListener('click', () => { hideDupOverlay(); });   // v5.8: 已进游戏，仅关弹窗继续玩（不再重复进游戏/重置棋盘）
+  document.getElementById('dupChange').addEventListener('click', () => {   // v5.8: 回登录框重新起名（当前局作废，重起名后开新局）
+    hideDupOverlay();
+    clearSave();                       // 清当前局本地+云端存档（防续玩残留）
+    nickname = '';                     // 解除设备锁定，输入框恢复可编辑
+    nameInput.value = '';
+    nameInput.disabled = false;
+    document.getElementById('lockTip').style.display = 'none';
+    nameOverlay.classList.add('show');
+    try { nameInput.focus(); } catch (e) {}
+  });
   window.addEventListener('resize', fitBoard);
 
   // v4.10.0: 道具按钮
