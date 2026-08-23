@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9.9</title>
+  <title>动物泡澡 · 手搓版 v5.9.10</title>
+<!-- v5.9.10（2026-08-24 凌晨）：角标改正圆（安琪反馈：单数字后宽 12.6 < 高 15，圆角 8px 撑不满变成竖椭圆很丑）——固定 15×15、border-radius 50%、flex 居中数字；emoji 微左移 3px 避让，仍零重叠 -->
 <!-- v5.9.9（2026-08-24 凌晨）：道具按钮协调优化（安琪）——角标 ×1/×2 改单数字 1/2（宽度减半），emoji 从偏左 10px 收敛到 5px、放大 22px 更饱满，按钮内"图标+角标"视觉更平衡；依旧零重叠 -->
 <!-- v5.9.8（2026-08-24 凌晨）：角标彻底不再"被切"——v5.9.7 角标仍悬在按钮右缘外（right -8px，圆角一半内一半外，视觉像被切）；改为角标完全坐进按钮内部右上角（top/right 2px），图标左移让位，任何设备都不会被裁切 -->
 <!-- v5.9.7（2026-08-24 凌晨）：道具角标微调——①图标左移 3px（右 padding 6px），角标不再压着 emoji 右上角，视觉上不被"切" ②角标红改黄（#FFCC00 黄底深棕字） -->
@@ -319,15 +320,16 @@
     display: flex; flex-direction: column; gap: 6px;
   }
   .power-col .btn.power {
-    flex: none; width: 44px; height: 44px; padding: 0 10px 0 0;
+    flex: none; width: 44px; height: 44px; padding: 0 15px 0 0;
     font-size: 22px; display: flex; align-items: center; justify-content: center;
     position: relative;
   }
   .power-col .btn.power .badge {
     position: absolute; top: 2px; right: 2px;
-    background: #FFCC00; color: #6B4F00; border-radius: 8px;
-    font-size: 10px; font-weight: 700; line-height: 1.5; padding: 0 3px;
-    margin-left: 0;
+    background: #FFCC00; color: #6B4F00; border-radius: 50%;
+    font-size: 10px; font-weight: 700; line-height: 1;
+    width: 15px; height: 15px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
   }
   .power-col .btn.power.cancel { flex: 0 0 auto; padding: 0; }
   /* 整理/锤子模式：禁投放（框选用） */
@@ -452,7 +454,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.9</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.10</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -508,7 +510,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.9.9 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.9.10 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -580,7 +582,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.9.9';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）
+const VER = 'v5.9.10';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -2113,6 +2115,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.9.10', '2026-08-24', '角标改正圆：15×15 圆形，数字居中'],
     ['v5.9.9', '2026-08-24', '道具图标更协调：角标改单数字，图标居中放大'],
     ['v5.9.8', '2026-08-24', '角标完全放进按钮内，不再悬空被切'],
     ['v5.9.7', '2026-08-24', '道具角标改黄色；图标左移，角标不再被切'],
