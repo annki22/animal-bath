@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9.10</title>
+  <title>动物泡澡 · 手搓版 v5.9.13</title>
+<!-- v5.9.13（2026-08-24）：锤子改为不可逆道具（安琪拍板：用完锤子后禁撤回）——doHammer 生效时清空撤销栈，锤子前的落子不可再撤回（防"砸完→撤回→重砸"白嫖），锤子后的新落子照常可撤；撤回不再退还锤子次数（锤子前快照已清） -->
+<!-- v5.9.12（2026-08-24）：修复手机端道具按钮遮挡棋盘（安琪反馈）——fitBoard 给右侧道具按钮列预留 56px 列宽：手机高视口下棋盘被 byWidth 撑到 tile 63/棋盘 325px（占 90% 屏宽），44px 按钮压进棋盘 33px；预留后窄屏棋盘回落基线 tile 50、按钮 40×40 贴右缘 2px，彻底不遮。宽屏 byHeight 主导，桌面棋盘尺寸零变化 -->
+<!-- v5.9.11（2026-08-24 凌晨）：存档不丢局（安琪反馈：刷新升级后上一局记录全没了）——读档从"版本严格相等"放宽为"结构完整 + 版本 ≥ v5.9"（COMPAT_VER），纯 UI 迭代的旧档直接带过来续玩；结构损坏/低于 v5.9 的档才作废 -->
 <!-- v5.9.10（2026-08-24 凌晨）：角标改正圆（安琪反馈：单数字后宽 12.6 < 高 15，圆角 8px 撑不满变成竖椭圆很丑）——固定 15×15、border-radius 50%、flex 居中数字；emoji 微左移 3px 避让，仍零重叠 -->
 <!-- v5.9.9（2026-08-24 凌晨）：道具按钮协调优化（安琪）——角标 ×1/×2 改单数字 1/2（宽度减半），emoji 从偏左 10px 收敛到 5px、放大 22px 更饱满，按钮内"图标+角标"视觉更平衡；依旧零重叠 -->
 <!-- v5.9.8（2026-08-24 凌晨）：角标彻底不再"被切"——v5.9.7 角标仍悬在按钮右缘外（right -8px，圆角一半内一半外，视觉像被切）；改为角标完全坐进按钮内部右上角（top/right 2px），图标左移让位，任何设备都不会被裁切 -->
@@ -315,13 +318,14 @@
   /* v5.9.2: 安琪否悬浮方案"太难看了"——hint 挪到标题下，power-row 回 bottombar 文档流但按钮改小，占用原 hint 位置 */
   /* v5.9.4: 道具按钮回昵称下方悬浮竖排（安琪拍板 2026-08-23 晚：bottombar 小按钮体验差）——absolute 不占文档流，棋盘不被挤压，按钮可放大 */
   /* v5.9.5: 安琪反馈宽按钮仍压棋盘右缘——改方块图标：44×44 纯 emoji + 次数角标，x 方向完全在棋盘右侧空白区 */
+  /* v5.9.12: 手机高视口棋盘被撑宽后 44px 按钮压棋盘（实测压 33px）——按钮缩到 40×40、右缘 6→2px 贴边，配合 fitBoard 预留列宽彻底不遮 */
   .power-col {
-    position: absolute; top: calc(100% + 4px); right: 6px; z-index: 30;
+    position: absolute; top: calc(100% + 4px); right: 2px; z-index: 30;
     display: flex; flex-direction: column; gap: 6px;
   }
   .power-col .btn.power {
-    flex: none; width: 44px; height: 44px; padding: 0 15px 0 0;
-    font-size: 22px; display: flex; align-items: center; justify-content: center;
+    flex: none; width: 40px; height: 40px; padding: 0 16px 0 0;
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
     position: relative;
   }
   .power-col .btn.power .badge {
@@ -454,7 +458,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.10</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.13</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -465,8 +469,8 @@
     <!-- v5.9.5: 道具按钮改方块图标（安琪拍板：95px 宽按钮压到棋盘右缘，只留 emoji 图标+次数角标，44×44 不碰棋盘） -->
     <div class="power-col" id="powerCol">
       <button class="btn power" id="reorgBtn" title="清场整理：点一下进入，3×3 黄框跟随鼠标/手指移动（大小固定不变），把框移到想整理的位置——电脑端点一下棋盘即生效，或点「确认整理」；点 ✕ 取消退出">🧹<span class="badge" id="reorgLeft">1</span></button>
-      <button class="btn power" id="undoBtn" title="撤回上一步：回到上一次落子/整理前（整理用过之后不可撤回）">↩<span class="badge" id="undoLeft">2</span></button>
-      <button class="btn power" id="hammerBtn" title="砸掉一颗棋子：点一下进入，1×1 黄框跟随鼠标/手指移动，框住想砸的棋子——电脑端点一下即砸，或点「确认砸」；点 ✕ 取消退出">🔨<span class="badge" id="hammerLeft">1</span></button>
+      <button class="btn power" id="undoBtn" title="撤回上一步：回到上一次落子/整理前（整理或锤子用过之后不可撤回）">↩<span class="badge" id="undoLeft">2</span></button>
+      <button class="btn power" id="hammerBtn" title="砸掉一颗棋子：点一下进入，1×1 黄框跟随鼠标/手指移动，框住想砸的棋子——电脑端点一下即砸，或点「确认砸」；点 ✕ 取消退出（砸掉后不可撤回）">🔨<span class="badge" id="hammerLeft">1</span></button>
       <button class="btn power cancel" id="reorgCancelBtn" title="取消整理" style="display:none">✕</button>
       <button class="btn power cancel" id="hammerCancelBtn" title="取消锤子" style="display:none">✕</button>
     </div>
@@ -510,7 +514,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.9.10 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.9.13 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -582,7 +586,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.9.10';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）
+const VER = 'v5.9.13';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -861,9 +865,14 @@ const EMOJI_IMGS = [
     const availW = board.parentElement.clientWidth - 24;
     if (!boardH || !availW) return;
     const gap = 2;
+    // v5.9.12: 右侧道具按钮列预留空间（按钮 40px + 右缘 2px + 间隙 8px + 余量 6px）——
+    // 手机高视口下 byHeight 很大、byWidth 主导会把棋盘撑满屏宽（360×800 实测 tile 63、棋盘 325px 占 90% 屏宽），
+    // 右侧 44px 按钮列被挤出容器、压进棋盘右缘（实测压 33px）。预留后窄屏棋盘回落到基线 tile 50；
+    // 宽屏 byWidth 本就远超 byHeight（tile 由高度决定），预留不影响桌面棋盘尺寸
+    const POWER_RESERVE = 56;
     // v4.9.1: 固定 6 行堆叠区——方块尺寸取"列宽"与"6 行恰好放下"的较小者，
     // 大屏不再出现警戒线上移/行数变多（电脑、手机一致 6 行）；矮屏自动缩小方块保证 6 行放得下
-    const byWidth = Math.max(34, Math.floor((availW - 10 - (COLS - 1) * gap) / COLS));   // v4.9.3: 列收缩居中布局，净列距=gap
+    const byWidth = Math.max(34, Math.floor((availW - 10 - (COLS - 1) * gap - POWER_RESERVE) / COLS));   // v4.9.3: 列收缩居中布局，净列距=gap
     // v4.9.2: 高度预算按 7 行算（线下 6 行堆叠 + 线上 1 行投放缓冲）——警戒线上方始终留出一行空间
     const byHeight = Math.max(24, Math.floor((boardH - 14 - ROWS * gap) / (ROWS + 1)));
     const tile = Math.min(byWidth, byHeight);
@@ -956,7 +965,7 @@ const EMOJI_IMGS = [
       nextQueue: nextQueue.slice(),
       maxLevel: maxLevel,
       reorgLeft: reorgLeft,
-      hammerLeft: hammerLeft   // v5.9: 锤子可撤回（快照含次数，撤回后一并退还）
+      hammerLeft: hammerLeft   // v5.9: 快照含锤子次数；v5.9.13: 锤子后清栈不可逆，此字段仅随锤子后的新落子快照保留（撤回时恢复的是锤子后状态）
     });
     if (undoStack.length > UNDO_MAX) undoStack.shift();   // 只保留最近几步
   }
@@ -972,7 +981,7 @@ const EMOJI_IMGS = [
     nextQueue = s.nextQueue;
     maxLevel = s.maxLevel;
     reorgLeft = s.reorgLeft;       // 退还整理次数（撤回整理 = 没整理）
-    hammerLeft = (s.hammerLeft !== undefined) ? s.hammerLeft : hammerLeft;   // v5.9: 退还锤子次数（旧快照防御）
+    hammerLeft = (s.hammerLeft !== undefined) ? s.hammerLeft : hammerLeft;   // v5.9: 快照含锤子次数（旧快照防御）；v5.9.13: 锤子不可逆后，此恢复仅作用于锤子之后的新落子快照（值即当前剩余次数）
     undoLeft--;                    // 撤回本身消耗一次
     updateScore(); render(); renderNext(); fitBoard();
     updatePowerUI();
@@ -1097,7 +1106,9 @@ const EMOJI_IMGS = [
     const s = stacks[col];
     if (!s || row >= s.length){ beep(150, 0.15, 'square', 0.08); return; }   // 框住的格子没有棋子：保持锤子模式可重选
     const lv = s[row];
-    pushUndo();                    // 锤子可撤回（快照含 hammerLeft，撤回后次数一并退还）
+    // v5.9.13: 锤子改为不可逆道具（安琪拍板：用完锤子后禁撤回）——清空撤销栈，锤子前的落子不可再撤回
+    //（防"砸完→撤回→重砸"白嫖；锤子砸掉后连锁下落/合成的结果不可反悔）；锤子之后的新落子照常可撤
+    undoStack = [];
     hammerFX(col, row, lv);        // 先播砸碎特效（DOM 未刷新）
     stacks[col].splice(row, 1);    // 砸掉该棋子，上方棋子自然下落
     hammerLeft--;
@@ -1723,7 +1734,7 @@ const EMOJI_IMGS = [
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
   function saveGame(){
     if (!nickname) return;
-    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname, ver: VER, reorgLeft: reorgLeft, undoLeft: undoLeft, hammerLeft: hammerLeft };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）；v4.9.12: 带版本号（旧版存档作废）；v4.10.0: 道具次数进存档（续玩不重置）；v4.10.6: 整理后清撤销栈（原 reorgUsed 字段废弃，旧档缺字段默认 false 兼容）；v5.9: 锤子次数进存档
+    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname, ver: VER, reorgLeft: reorgLeft, undoLeft: undoLeft, hammerLeft: hammerLeft };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）；v4.9.12: 带版本号（旧版存档作废）；v4.10.0: 道具次数进存档（续玩不重置）；v4.10.6: 整理后清撤销栈（原 reorgUsed 字段废弃，旧档缺字段默认 false 兼容）；v5.9: 锤子次数进存档；v5.9.11: 读档放宽为版本下限校验，此字段仍是当前版本标记（下次保存自动升级）
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
     if (cloudTimer) clearTimeout(cloudTimer);
     cloudTimer = setTimeout(() => {
@@ -1776,15 +1787,24 @@ const EMOJI_IMGS = [
     }
   }
 
-  // v4.9.12: 存档版本校验——旧版本（含无版本号）的存档视为无效，直接作废清掉
+  // v5.9.11: 存档宽容校验——不再要求版本号严格等于当前版。结构完整（stacks 数组 + score 数字）且版本 >= COMPAT_VER 的旧档一律带过来续玩：
+  // 纯 UI 迭代（v5.9.5 后）刷新不再丢局；v5.9 之前的档/无版本号/结构损坏的档才作废（规则变化大，棋盘状态可能不兼容）。
+  // COMPAT_VER = v5.9：v5.9 引入 hammerLeft 且读档缺字段默认 1（之后存档结构零变化），作为兼容最低线
+  const COMPAT_VER = 'v5.9';
+  function verNum(s){
+    const m = String(s || '').match(/^v(\d+)(?:\.(\d+))?/);
+    return m ? Number(m[1]) * 1000 + Number(m[2] || 0) : -1;   // 忽略 patch 级（不影响结构），v5.9.x 均视为 v5.9
+  }
+  // v4.9.12: 存档版本校验——旧版本（含无版本号）的存档视为无效，直接作废清掉（v5.9.11: 放宽为结构+版本下限双重校验）
   function saveIsCurrent(state){
-    return !!state && state.ver === VER;
+    if (!state || typeof state !== 'object' || !Array.isArray(state.stacks) || typeof state.score !== 'number') return false;
+    return verNum(state.ver) >= verNum(COMPAT_VER);
   }
 
   function loadLocalSave(){
     try {
       const state = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-      if (state && !saveIsCurrent(state)){ clearSave(); return null; }   // v4.9.12: 旧版本本地存档作废（迭代重开不代入旧局）
+      if (state && !saveIsCurrent(state)){ clearSave(); return null; }   // v4.9.12: 旧版本本地存档作废（v5.9.11: 放宽——仅结构损坏或低于 v5.9 的档作废，纯 UI 迭代的旧档保留续玩）
       return state;
     } catch (e) { return null; }
   }
@@ -1796,7 +1816,7 @@ const EMOJI_IMGS = [
       const rows = await r.json();
       if (Array.isArray(rows) && rows.length){
         const state = rows[0].state;
-        if (!saveIsCurrent(state)){   // v4.9.12: 旧版本云端存档作废
+        if (!saveIsCurrent(state)){   // v4.9.12: 旧版本云端存档作废（v5.9.11: 放宽——仅结构损坏或低于 v5.9 的档作废）
           sbFetch('saves?nickname=eq.' + encodeURIComponent(nickname), { method: 'DELETE' }).catch(() => {});
           return null;
         }
@@ -2115,6 +2135,9 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.9.13', '2026-08-24', '锤子改为不可逆道具：用完锤子后禁撤回，砸掉的结果不可反悔（锤子后的新落子照常可撤）'],
+    ['v5.9.12', '2026-08-24', '修复手机端道具按钮遮挡棋盘：按钮移到棋盘右侧不再压边，棋盘回落标准方块大小'],
+    ['v5.9.11', '2026-08-24', '存档不丢局：刷新升级后旧档保留，未结束的局直接继续玩'],
     ['v5.9.10', '2026-08-24', '角标改正圆：15×15 圆形，数字居中'],
     ['v5.9.9', '2026-08-24', '道具图标更协调：角标改单数字，图标居中放大'],
     ['v5.9.8', '2026-08-24', '角标完全放进按钮内，不再悬空被切'],
