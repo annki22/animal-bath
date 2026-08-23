@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9</title>
+  <title>动物泡澡 · 手搓版 v5.9.5</title>
+<!-- v5.9.5（2026-08-23 晚）：道具按钮改方块图标（安琪拍板：v5.9.4 宽按钮压棋盘右缘）——44×44 纯 emoji + 红色次数角标（×1/×2），x 方向完全落在棋盘右侧空白区（棋盘右缘 768 / 按钮左缘 ~800），零重叠 -->
+<!-- v5.9.4（2026-08-23 晚）：道具按钮放回右上角昵称下方悬浮竖排（安琪拍板：v5.9.2 底部小按钮 10px/88px 体验差）——.power-col absolute 不占文档流、按钮恢复大尺寸（padding 10px 14px / 13px），bottombar 移除 power-row（bottombar 变矮、棋盘高度/tile 增大）；登录页版本行 v5.8→v5.9 -->
 <!-- v5.9（2026-08-23）：①锤子道具（安琪拍板）：1×1 框砸一颗、初始 1 次、可撤回（次数一并退还）、埋点 power_use type:hammer ②超线救场（安琪拍板，推翻 v4.9.1 越线直接结束）：越线弹窗列剩余道具→使用道具救场（禁投子）→每次道具后检查救回 ③道具横排：整理/撤回/锤子移到 bottombar .power-row（A 方案；v5.9.1 悬浮方案被否）④顶部「点列投放」提示行删除（安琪拍板），topbar padding 补偿占位、棋盘位置尺寸零变化 -->
 <!-- v5.8（2026-08-23）：登录优化——①起名查重不堵门口：先进游戏、后台查、撞名再弹窗提醒（本人确认继续/换名，同设备锁定不变）②所有云端请求 8 秒超时兜底：国内网络下 Supabase 偶发挂起不再无限卡死（看板 8/20 同款修复）③查重两次查询改并行 -->
 <!-- v5.7（2026-08-22）：新设备起名撞名软提醒——不再硬拦，弹窗问"可能与别人ID重复，是否要更改？"，本人确认可不更改直接生效（同设备锁定昵称仍不可改、保持不变），非本人可换名；VERSIONS 更新说明润色+补日期 -->
@@ -298,20 +300,32 @@
   .btn.restart { background: #E8E6E0; color: #6B7280; }
   .btn.mute-btn { width: 48px; padding: 13px 0; text-align: center; font-size: 16px; flex: none; }
   /* v4.10.1: 道具按钮（整理×1 / 撤回×2）——昵称下方竖排 */
-  .btn.power { background: #E4F4F8; color: #3E7C8C; padding: 8px 12px; font-size: 12px; }
+  .btn.power { background: #E4F4F8; color: #3E7C8C; padding: 10px 14px; font-size: 13px; }
   .btn.power:disabled { opacity: .35; cursor: default; transform: none; }
   .btn.power.active { background: #FFD75E; color: #8A6D00; }
   .btn.power.cancel { background: #F3F1EB; color: #9AA0A6; }
   .btn.power .badge { font-weight: 900; margin-left: 2px; }
-  /* v5.9(本地): 道具按钮——底部横排一行（A 方案，安琪拍板 2026-08-23）。原 v4.10.2 右上角悬浮竖排（.power-col）废弃 */
-  /* v5.9.1(本地): 安琪反馈"棋盘变小了"——power-row 占文档流挤压棋盘。改回悬浮：absolute 叠在棋盘顶部内侧，不占棋盘高度（实测棋盘 305→351px、tile 39→45px） */
-  /* v5.9.2(本地): 安琪否悬浮方案"太难看了"——hint 挪到标题下，power-row 回 bottombar 文档流但按钮改小，占用原 hint 位置 */
-  .power-row {
-    display: flex; gap: 6px; justify-content: center;
+  /* v5.9: 道具按钮——底部横排一行（A 方案，安琪拍板 2026-08-23）。原 v4.10.2 右上角悬浮竖排（.power-col）废弃 */
+  /* v5.9.1: 安琪反馈"棋盘变小了"——power-row 占文档流挤压棋盘。改回悬浮：absolute 叠在棋盘顶部内侧，不占棋盘高度（实测棋盘 305→351px、tile 39→45px） */
+  /* v5.9.2: 安琪否悬浮方案"太难看了"——hint 挪到标题下，power-row 回 bottombar 文档流但按钮改小，占用原 hint 位置 */
+  /* v5.9.4: 道具按钮回昵称下方悬浮竖排（安琪拍板 2026-08-23 晚：bottombar 小按钮体验差）——absolute 不占文档流，棋盘不被挤压，按钮可放大 */
+  /* v5.9.5: 安琪反馈宽按钮仍压棋盘右缘——改方块图标：44×44 纯 emoji + 次数角标，x 方向完全在棋盘右侧空白区 */
+  .power-col {
+    position: absolute; top: calc(100% + 4px); right: 6px; z-index: 30;
+    display: flex; flex-direction: column; gap: 6px;
   }
-.power-row .btn.power { flex: 1; min-width: 0; max-width: 88px; text-align: center; padding: 2px 6px; font-size: 10px; }
-  .power-row .btn.power .badge { font-size: 10px; }
-  .power-row .btn.power.cancel { flex: 0 0 auto; max-width: none; padding: 5px 10px; }
+  .power-col .btn.power {
+    flex: none; width: 44px; height: 44px; padding: 0;
+    font-size: 20px; display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .power-col .btn.power .badge {
+    position: absolute; top: -5px; right: -8px;
+    background: #FF6B6B; color: #fff; border-radius: 8px;
+    font-size: 10px; font-weight: 700; line-height: 1.5; padding: 0 4px;
+    margin-left: 0;
+  }
+  .power-col .btn.power.cancel { flex: 0 0 auto; }
   /* 整理/锤子模式：禁投放（框选用） */
   .cols.no-pointer { pointer-events: none; }
   /* v4.10.1: 整理模式下棋盘不滚动（手机点击拖选需要 touch-action: none，否则触摸被浏览器当滚动拦截） */
@@ -396,7 +410,7 @@
   .modal .sub { font-size: 13px; color: #9AA0A8; margin-bottom: 16px; }
   .modal .btn { width: 100%; padding: 13px; font-size: 15px; border-radius: 16px; }
   .btn.ghost { background: #E8E6E0; color: #6B7280; margin-top: 8px; }
-  /* v5.9(本地): 越线救场弹窗——剩余道具清单 */
+  /* v5.9: 越线救场弹窗——剩余道具清单 */
   .rescue-powers { font-size: 13px; font-weight: 700; color: #3E7C8C; margin: -6px 0 14px; line-height: 1.8; }
 
   /* ===== 昵称 & 排行榜 ===== */
@@ -434,17 +448,25 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.5</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
       <div class="best">最高 <span id="best">0</span></div>
-      <!-- v4.10.1: 道具移到昵称下面，竖排；v5.9(本地): 挪到底部横排一行（A 方案，安琪拍板 2026-08-23） -->
+      <!-- v4.10.1: 道具移到昵称下面，竖排；v5.9: 挪到底部横排一行（A 方案，安琪拍板 2026-08-23） -->
       <div class="who" id="whoBtn">👤 <span id="whoName">未登录</span></div>
+    </div>
+    <!-- v5.9.5: 道具按钮改方块图标（安琪拍板：95px 宽按钮压到棋盘右缘，只留 emoji 图标+次数角标，44×44 不碰棋盘） -->
+    <div class="power-col" id="powerCol">
+      <button class="btn power" id="reorgBtn" title="清场整理：点一下进入，3×3 黄框跟随鼠标/手指移动（大小固定不变），把框移到想整理的位置——电脑端点一下棋盘即生效，或点「确认整理」；点 ✕ 取消退出">🧹<span class="badge" id="reorgLeft">×1</span></button>
+      <button class="btn power" id="undoBtn" title="撤回上一步：回到上一次落子/整理前（整理用过之后不可撤回）">↩<span class="badge" id="undoLeft">×2</span></button>
+      <button class="btn power" id="hammerBtn" title="砸掉一颗棋子：点一下进入，1×1 黄框跟随鼠标/手指移动，框住想砸的棋子——电脑端点一下即砸，或点「确认砸」；点 ✕ 取消退出">🔨<span class="badge" id="hammerLeft">×1</span></button>
+      <button class="btn power cancel" id="reorgCancelBtn" title="取消整理" style="display:none">✕</button>
+      <button class="btn power cancel" id="hammerCancelBtn" title="取消锤子" style="display:none">✕</button>
     </div>
   </div>
 
-  <!-- v5.9.3(本地): 顶部提示行删除（安琪拍板：不要「按列投放」文案）；topbar padding-bottom 已补偿占位，棋盘位置/尺寸不变 -->
+  <!-- v5.9.3: 顶部提示行删除（安琪拍板：不要「按列投放」文案）；topbar padding-bottom 已补偿占位，棋盘位置/尺寸不变 -->
 <div class="next-row">
     <span class="next-label">下一个</span>
     <div class="next-slot current" id="next1"><span class="cur-tag">当前</span></div>
@@ -465,14 +487,6 @@
   </div>
 
   <div class="bottombar">
-    <!-- v5.9.2(本地): 道具小按钮回到底部（安琪方案：hint 挪标题下、道具改小放进原 hint 位置） -->
-    <div class="power-row">
-      <button class="btn power" id="reorgBtn" title="清场整理：点一下进入，3×3 黄框跟随鼠标/手指移动（大小固定不变），把框移到想整理的位置——电脑端点一下棋盘即生效，或点「确认整理」；点 ✕ 取消退出">🧹 整理<span class="badge" id="reorgLeft">×1</span></button>
-      <button class="btn power" id="undoBtn" title="撤回上一步：回到上一次落子/整理前（整理用过之后不可撤回）">↩ 撤回<span class="badge" id="undoLeft">×2</span></button>
-      <button class="btn power" id="hammerBtn" title="砸掉一颗棋子：点一下进入，1×1 黄框跟随鼠标/手指移动，框住想砸的棋子——电脑端点一下即砸，或点「确认砸」；点 ✕ 取消退出">🔨 锤子<span class="badge" id="hammerLeft">×1</span></button>
-      <button class="btn power cancel" id="reorgCancelBtn" title="取消整理" style="display:none">✕ 取消</button>
-      <button class="btn power cancel" id="hammerCancelBtn" title="取消锤子" style="display:none">✕ 取消</button>
-    </div>
     <div class="bar2">
       <span class="combo" id="combo"></span>
       <div class="btn-row">
@@ -490,7 +504,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.8 · 五列 · 越线才结束 · 道具：整理/撤回</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.9.5 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -532,7 +546,7 @@
     </div>
   </div>
 
-  <!-- 越线救场（v5.9(本地)）：超线不再直接结束，给一次道具救场机会 -->
+  <!-- 越线救场（v5.9）：超线不再直接结束，给一次道具救场机会 -->
   <div class="overlay" id="rescueOverlay">
     <div class="modal">
       <div class="emoji">⚠️</div>
@@ -562,7 +576,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.8';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废
+const VER = 'v5.9.5';   // v4.9.12: 存档版本标记——版本不符的旧存档一律作废（迭代中重开强制刷新，不代入上一版本）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -737,7 +751,7 @@ const EMOJI_IMGS = [
   let undoStack = [];    // 撤回快照栈（压栈：每次落子/整理前；弹出：撤回时恢复）
   let reorgMode = false; // 整理模式开关（开启时禁投放、拖拽框选）
   let reorgSel = null;   // 当前框选矩形 {c0,c1,r0,r1}
-  // v5.9(本地): 锤子道具 + 越线救场
+  // v5.9: 锤子道具 + 越线救场
   let hammerLeft = 1;    // 锤子次数（每局 1 次）
   let hammerMode = false;// 锤子模式开关（开启时禁投放、1×1 框选）
   let hammerSel = null;  // 当前 1×1 框选 {c0,c1,r0,r1}（单格 c0==c1、r0==r1）
@@ -770,11 +784,11 @@ const EMOJI_IMGS = [
   const undoBtn = document.getElementById('undoBtn');       // v4.10.0: 撤回按钮
   const reorgLeftEl = document.getElementById('reorgLeft'); // v4.10.0: 整理次数
   const undoLeftEl = document.getElementById('undoLeft');   // v4.10.0: 撤回次数
-  const hammerBtn = document.getElementById('hammerBtn');         // v5.9(本地): 锤子按钮
-  const hammerCancelBtn = document.getElementById('hammerCancelBtn');   // v5.9(本地): 锤子取消按钮
-  const hammerLeftEl = document.getElementById('hammerLeft');     // v5.9(本地): 锤子次数
-  const hammerRect = document.getElementById('hammerRect');       // v5.9(本地): 锤子 1×1 框选矩形
-  const rescueOverlay = document.getElementById('rescueOverlay'); // v5.9(本地): 越线救场弹窗
+  const hammerBtn = document.getElementById('hammerBtn');         // v5.9: 锤子按钮
+  const hammerCancelBtn = document.getElementById('hammerCancelBtn');   // v5.9: 锤子取消按钮
+  const hammerLeftEl = document.getElementById('hammerLeft');     // v5.9: 锤子次数
+  const hammerRect = document.getElementById('hammerRect');       // v5.9: 锤子 1×1 框选矩形
+  const rescueOverlay = document.getElementById('rescueOverlay'); // v5.9: 越线救场弹窗
 
   bestEl.textContent = best.toLocaleString();
   try { nickname = localStorage.getItem(NICK_KEY) || ''; } catch (e) {}
@@ -936,7 +950,7 @@ const EMOJI_IMGS = [
       nextQueue: nextQueue.slice(),
       maxLevel: maxLevel,
       reorgLeft: reorgLeft,
-      hammerLeft: hammerLeft   // v5.9(本地): 锤子可撤回（快照含次数，撤回后一并退还）
+      hammerLeft: hammerLeft   // v5.9: 锤子可撤回（快照含次数，撤回后一并退还）
     });
     if (undoStack.length > UNDO_MAX) undoStack.shift();   // 只保留最近几步
   }
@@ -952,13 +966,13 @@ const EMOJI_IMGS = [
     nextQueue = s.nextQueue;
     maxLevel = s.maxLevel;
     reorgLeft = s.reorgLeft;       // 退还整理次数（撤回整理 = 没整理）
-    hammerLeft = (s.hammerLeft !== undefined) ? s.hammerLeft : hammerLeft;   // v5.9(本地): 退还锤子次数（旧快照防御）
+    hammerLeft = (s.hammerLeft !== undefined) ? s.hammerLeft : hammerLeft;   // v5.9: 退还锤子次数（旧快照防御）
     undoLeft--;                    // 撤回本身消耗一次
     updateScore(); render(); renderNext(); fitBoard();
     updatePowerUI();
     saveGame();                    // 撤回也是状态变更，立刻存档
     trackEvent('power_use', { type: 'undo', left: undoLeft });   // v5.4: 道具埋点
-    rescueCheck();                 // v5.9(本地): 救场模式中撤回后检查是否解除越线
+    rescueCheck();                 // v5.9: 救场模式中撤回后检查是否解除越线
     beep(300, 0.14, 'sine', 0.10); // 撤回音（低柔上行）
   }
 
@@ -967,16 +981,16 @@ const EMOJI_IMGS = [
     // v4.10.3: 去掉 busy 置灰——原来每次落子/合成按钮灰一下又亮（动画期间 disabled 反复切换），视觉上就是闪烁；
     //  现在按钮外观保持稳定，下落/合成期间点击由各 handler 内的 busy 检查直接拦截（点了没反应，不闪）
     reorgBtn.disabled = (reorgLeft <= 0);
-    undoBtn.disabled = (undoLeft <= 0) || !undoStack.length || reorgMode || hammerMode;   // v4.9.15: 整理不再禁用撤回（栈已清,整理后新落子照常可撤）；v5.9(本地): 锤子模式中同样禁撤回
-    hammerBtn.disabled = (hammerLeft <= 0);   // v5.9(本地)
+    undoBtn.disabled = (undoLeft <= 0) || !undoStack.length || reorgMode || hammerMode;   // v4.9.15: 整理不再禁用撤回（栈已清,整理后新落子照常可撤）；v5.9: 锤子模式中同样禁撤回
+    hammerBtn.disabled = (hammerLeft <= 0);   // v5.9
     reorgLeftEl.textContent = '×' + reorgLeft;
     undoLeftEl.textContent = '×' + undoLeft;
-    hammerLeftEl.textContent = '×' + hammerLeft;   // v5.9(本地)
+    hammerLeftEl.textContent = '×' + hammerLeft;   // v5.9
     reorgBtn.classList.toggle('active', reorgMode);
-    hammerBtn.classList.toggle('active', hammerMode);   // v5.9(本地)
+    hammerBtn.classList.toggle('active', hammerMode);   // v5.9
     // v4.10.6: 按钮文字统一由 setReorgMode 管理（进入模式 = "✓ 确认整理"，确认制）；此处保持同步防止 updatePowerUI 后调用时覆盖回旧文字
     if (reorgBtn.firstChild) reorgBtn.firstChild.textContent = reorgMode ? '✓ 确认整理' : '🧹 整理';
-    // v5.9(本地): 锤子同款（进入模式 = "🔨 确认砸"）
+    // v5.9: 锤子同款（进入模式 = "🔨 确认砸"）
     if (hammerBtn.firstChild) hammerBtn.firstChild.textContent = hammerMode ? '🔨 确认砸' : '🔨 锤子';
   }
 
@@ -995,7 +1009,7 @@ const EMOJI_IMGS = [
     reorgSel = null;
     reorgRect.classList.remove('show');
     clearHoverHL();
-    syncBoardLock();   // v5.9(本地): 统一棋盘锁（整理/锤子/救场任一开启即禁投放），原 colsEl.classList.toggle('no-pointer')
+    syncBoardLock();   // v5.9: 统一棋盘锁（整理/锤子/救场任一开启即禁投放），原 colsEl.classList.toggle('no-pointer')
     // v4.10.6: 进入模式后整理按钮变"确认整理"（badge 保留不重建，reorgLeftEl 引用不失效），并显示取消按钮
     const tn = reorgBtn.firstChild;   // 文本节点（badge span 是第二个子节点）
     if (tn) tn.nodeValue = on ? '✓ 确认整理' : '🧹 整理';
@@ -1004,7 +1018,7 @@ const EMOJI_IMGS = [
     updatePowerUI();
   }
 
-  // ===== 锤子（v5.9(本地)）：1×1 框选单格，砸掉一颗棋子 =====
+  // ===== 锤子（v5.9）：1×1 框选单格，砸掉一颗棋子 =====
   // 规则（安琪拍板 2026-08-23）：框就是 1×1，只能砸一颗；初始 1 次；交互与整理同款——点锤子 → 1×1 黄框跟随
   //  鼠标/手指 → 电脑端点一下棋盘即砸（或点「🔨 确认砸」按钮）→ 砸掉那一颗 → 次数 -1；点 ✕ 取消退出。
   //  · 砸掉后上方棋子自然下落，不触发合成；可被撤回（快照含次数，撤回后次数一并退还）
@@ -1023,7 +1037,7 @@ const EMOJI_IMGS = [
   }
 
   // 指针坐标 → 1×1 框（单格；列号 clamp 到棋盘内，行号按实际列高 clamp——越线时第 7 层（row 6）也要能选中，
-  //  不能像 3×3 那样 clamp 到 ROWS-1（v5.9(本地) 实测：clamp 到 5 导致锤子永远砸到越线层下面那颗））
+  //  不能像 3×3 那样 clamp 到 ROWS-1（v5.9 实测：clamp 到 5 导致锤子永远砸到越线层下面那颗））
   function showHammerFrame(x, y){
     const sel = rectToSel(x, y, x, y);
     if (!sel){
@@ -1086,10 +1100,10 @@ const EMOJI_IMGS = [
     updatePowerUI();
     saveGame();
     trackEvent('power_use', { type: 'hammer', left: hammerLeft });   // v5.4: 道具埋点
-    rescueCheck();                 // v5.9(本地): 救场模式中砸完检查是否解除越线
+    rescueCheck();                 // v5.9: 救场模式中砸完检查是否解除越线
   }
 
-  // ===== 越线救场（v5.9(本地)）：超线不再直接结束 =====
+  // ===== 越线救场（v5.9）：超线不再直接结束 =====
   // 规则（安琪拍板 2026-08-23）：越线 → 弹确认框（剩余道具清单）→「使用道具救场」进入救场模式（禁投子、
   //  道具可用）→ 每次用道具后复查：超线解除（列回 6 层内）则正常继续；未解除且还有道具则继续救；
   //  道具用尽没救回来 → 直接结算；「放弃，结束游戏」直接结算。
@@ -1369,7 +1383,7 @@ const EMOJI_IMGS = [
       busy = false;
       updatePowerUI();
       if (myGen === gen){
-        if (rescueMode) rescueCheck();   // v5.9(本地): 救场中整理后检查是否解除越线
+        if (rescueMode) rescueCheck();   // v5.9: 救场中整理后检查是否解除越线
         else checkGameOver();
         if (running) saveGame();
       }
@@ -1381,7 +1395,7 @@ const EMOJI_IMGS = [
     if (!running) return;
     if (busy) return;   // v4.9.6: 合成动画未完成时点击不投放（推翻 v4.9 排队补投——动画结束自动投出非玩家预期）
     if (reorgMode) return;   // v4.10.0: 整理模式中禁投放
-    if (hammerMode || rescueMode) return;   // v5.9(本地): 锤子模式/救场模式中禁投放
+    if (hammerMode || rescueMode) return;   // v5.9: 锤子模式/救场模式中禁投放
     pushUndo();   // v4.10.0: 落子前压快照（撤回用）
     busy = true;
     updatePowerUI();   // v4.10.0: 动画期间禁用道具
@@ -1599,7 +1613,7 @@ const EMOJI_IMGS = [
   async function checkGameOver(){
     const myGen = gen;   // v4.9: 记录局号——等待提交期间开了新局，就不再弹结算榜
     if (!isOverflow()) return;
-    // v5.9(本地): 超线不再直接结束——有道具先弹救场确认框（防误触/给道具救场机会）
+    // v5.9: 超线不再直接结束——有道具先弹救场确认框（防误触/给道具救场机会）
     const canRescue = (reorgLeft > 0) || (undoLeft > 0) || (hammerLeft > 0);
     if (canRescue && !rescueMode){
       showRescueOverlay();
@@ -1608,7 +1622,7 @@ const EMOJI_IMGS = [
     await doGameOver(myGen, 'overflow');
   }
 
-  // v5.9(本地): 结算统一入口（越线 / 救场放弃 / 道具用尽）
+  // v5.9: 结算统一入口（越线 / 救场放弃 / 道具用尽）
   async function doGameOver(myGen, reason){
     running = false;
     clearSave();   // v4.9: 结束即清存档——否则死后强退再进会"复活"到临终棋盘
@@ -1703,7 +1717,7 @@ const EMOJI_IMGS = [
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
   function saveGame(){
     if (!nickname) return;
-    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname, ver: VER, reorgLeft: reorgLeft, undoLeft: undoLeft, hammerLeft: hammerLeft };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）；v4.9.12: 带版本号（旧版存档作废）；v4.10.0: 道具次数进存档（续玩不重置）；v4.10.6: 整理后清撤销栈（原 reorgUsed 字段废弃，旧档缺字段默认 false 兼容）；v5.9(本地): 锤子次数进存档
+    const state = { stacks: stacks, score: score, dropCount: dropCount, nextQueue: nextQueue, maxLevel: maxLevel, nickname: nickname, ver: VER, reorgLeft: reorgLeft, undoLeft: undoLeft, hammerLeft: hammerLeft };   // v4.9: 存档带最大合成数（续玩不断档）+ 绑昵称（防换号读到别人存档）；v4.9.12: 带版本号（旧版存档作废）；v4.10.0: 道具次数进存档（续玩不重置）；v4.10.6: 整理后清撤销栈（原 reorgUsed 字段废弃，旧档缺字段默认 false 兼容）；v5.9: 锤子次数进存档
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
     if (cloudTimer) clearTimeout(cloudTimer);
     cloudTimer = setTimeout(() => {
@@ -1798,11 +1812,11 @@ const EMOJI_IMGS = [
     // v4.10.0: 道具次数恢复（旧档/缺字段回默认——VER 已隔离旧版，此处仅防御）
     reorgLeft = Number.isFinite(Number(state.reorgLeft)) ? Number(state.reorgLeft) : 1;
     undoLeft = Number.isFinite(Number(state.undoLeft)) ? Number(state.undoLeft) : 2;
-    hammerLeft = Number.isFinite(Number(state.hammerLeft)) ? Number(state.hammerLeft) : 1;   // v5.9(本地): 锤子次数恢复（旧档缺字段回默认）
+    hammerLeft = Number.isFinite(Number(state.hammerLeft)) ? Number(state.hammerLeft) : 1;   // v5.9: 锤子次数恢复（旧档缺字段回默认）
     undoStack = [];   // 续玩不继承撤回栈（跨会话撤回无意义，防止旧局快照污染新盘）
     reorgMode = false; reorgSel = null;
-    hammerMode = false; hammerSel = null;   // v5.9(本地)
-    rescueMode = false;   // v5.9(本地): 续玩不继承救场状态（恢复后按棋盘重新判断）
+    hammerMode = false; hammerSel = null;   // v5.9
+    rescueMode = false;   // v5.9: 续玩不继承救场状态（恢复后按棋盘重新判断）
     updatePowerUI();
     running = true; busy = false;
     updateScore();
@@ -1810,7 +1824,7 @@ const EMOJI_IMGS = [
     hideNameOverlay();
     gameStartTs = Date.now();
     trackEvent('game_start', { continue: true });   // v5.4: 续玩埋点
-    // v5.9(本地): 续玩恢复的棋盘若已越线（救场中强退留下的存档）——有道具弹救场，没道具直接结算
+    // v5.9: 续玩恢复的棋盘若已越线（救场中强退留下的存档）——有道具弹救场，没道具直接结算
     if (isOverflow()){
       const canRescue = (reorgLeft > 0) || (undoLeft > 0) || (hammerLeft > 0);
       if (canRescue) showRescueOverlay();
@@ -2058,7 +2072,7 @@ const EMOJI_IMGS = [
     score = 0; dropCount = 0; maxLevel = 1;
     // v4.10.0: 道具重置（每局 整理×1 撤回×2，撤回栈清空——新局不带旧局快照）
     reorgLeft = 1; undoLeft = 2; undoStack = []; reorgMode = false; reorgSel = null;
-    // v5.9(本地): 锤子×1 + 救场状态重置
+    // v5.9: 锤子×1 + 救场状态重置
     hammerLeft = 1; hammerMode = false; hammerSel = null;
     rescueMode = false;
     running = true; busy = false;
@@ -2095,6 +2109,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.9.5', '2026-08-24', '道具按钮改方块图标，更省地方不挡棋盘'],
     ['v5.9',  '2026-08-23', '新增锤子道具；越线时可用道具救场，继续游戏'],
     ['v5.8',  '2026-08-23', '登录更顺畅：进游戏不再等待，撞名会提醒；网络波动时也不卡顿'],
     ['v5.7',  '2026-08-22', '起名更贴心：新设备遇到重名会提醒，可确认继续或换个昵称'],
@@ -2132,12 +2147,12 @@ const EMOJI_IMGS = [
   ];  document.getElementById('updList').innerHTML = VERSIONS.map(v =>
     `<div class="upd-item"><div class="upd-v">${v[0]}<span class="upd-d">${v[1]}</span></div><div class="upd-t">${v[2]}</div></div>`
   ).join('');
-  document.getElementById('updBtn').addEventListener('click', () => { trackEvent('upd_view', {}); updOverlay.classList.add('show'); });   // v5.9(本地): 更新说明弹窗埋点
+  document.getElementById('updBtn').addEventListener('click', () => { trackEvent('upd_view', {}); updOverlay.classList.add('show'); });   // v5.9: 更新说明弹窗埋点
   document.getElementById('updClose').addEventListener('click', () => { updOverlay.classList.remove('show'); });
-  document.getElementById('verLink').addEventListener('click', () => { trackEvent('upd_view', {}); updOverlay.classList.add('show'); });   // v5.9(本地): 版本号入口同样计
+  document.getElementById('verLink').addEventListener('click', () => { trackEvent('upd_view', {}); updOverlay.classList.add('show'); });   // v5.9: 版本号入口同样计
 
   // v4.9.12: 重开 = 清档 + 强制刷新页面（安琪要求：随时在迭代，重开必须加载最新代码，不代入上一局/上一版本任何状态）
-  document.getElementById('restartBtn').addEventListener('click', () => { trackEvent('restart', {}); clearSave(); location.reload(); });   // v5.9(本地): 主动重开埋点
+  document.getElementById('restartBtn').addEventListener('click', () => { trackEvent('restart', {}); clearSave(); location.reload(); });   // v5.9: 主动重开埋点
   // v4.8.4 修复：不能直接传 showRank——事件对象会被当成 fromGame 参数（truthy）导致 afterGameRank=true，关闭时误开新局清空棋盘
   document.getElementById('rankBtn').addEventListener('click', () => showRank(false));
   const muteBtn = document.getElementById('muteBtn');
@@ -2179,11 +2194,11 @@ const EMOJI_IMGS = [
       return;
     }
     if (reorgLeft <= 0 || busy || !running) return;
-    if (hammerMode) setHammerMode(false);   // v5.9(本地): 与锤子互斥
+    if (hammerMode) setHammerMode(false);   // v5.9: 与锤子互斥
     setReorgMode(true);
   });
   reorgCancelBtn.addEventListener('click', () => { setReorgMode(false); });   // v4.10.6: 取消整理（不生效）
-  // v5.9(本地): 锤子按钮——进入模式（🔨 锤子）→ 再点 = 确认砸（用当前框位置，没选过则默认棋盘中心 1×1）
+  // v5.9: 锤子按钮——进入模式（🔨 锤子）→ 再点 = 确认砸（用当前框位置，没选过则默认棋盘中心 1×1）
   hammerBtn.addEventListener('click', () => {
     if (hammerMode){
       if (hammerLeft <= 0 || busy || !running) return;
@@ -2192,11 +2207,11 @@ const EMOJI_IMGS = [
       return;
     }
     if (hammerLeft <= 0 || busy || !running) return;
-    if (reorgMode) setReorgMode(false);   // v5.9(本地): 与整理互斥
+    if (reorgMode) setReorgMode(false);   // v5.9: 与整理互斥
     setHammerMode(true);
   });
-  hammerCancelBtn.addEventListener('click', () => { setHammerMode(false); });   // v5.9(本地): 取消锤子（不生效）
-  // v5.9(本地): 越线救场弹窗——使用道具救场 / 放弃结束
+  hammerCancelBtn.addEventListener('click', () => { setHammerMode(false); });   // v5.9: 取消锤子（不生效）
+  // v5.9: 越线救场弹窗——使用道具救场 / 放弃结束
   document.getElementById('rescueGo').addEventListener('click', () => {
     rescueOverlay.classList.remove('show');
     setRescueMode(true);
@@ -2240,7 +2255,7 @@ const EMOJI_IMGS = [
     reorgRect.classList.add('show');
   }
   board.addEventListener('pointerdown', (e) => {
-    if ((!reorgMode && !hammerMode) || busy || !running) return;   // v5.9(本地): 锤子模式同款
+    if ((!reorgMode && !hammerMode) || busy || !running) return;   // v5.9: 锤子模式同款
     if (e.button !== undefined && e.button !== 0) return;   // 仅左键
     dragStart = { x: e.clientX, y: e.clientY };
     if (reorgMode) showReorgFrame(e.clientX, e.clientY); else showHammerFrame(e.clientX, e.clientY);   // 按下立即出框（手机：手指落下就显示，滑动跟随）
@@ -2248,11 +2263,11 @@ const EMOJI_IMGS = [
     e.preventDefault();
   });
   board.addEventListener('pointermove', (e) => {
-    if ((!reorgMode && !hammerMode) || busy || !running) return;   // v5.9(本地): 锤子模式同款
+    if ((!reorgMode && !hammerMode) || busy || !running) return;   // v5.9: 锤子模式同款
     if (reorgMode) showReorgFrame(e.clientX, e.clientY); else showHammerFrame(e.clientX, e.clientY);   // 按下与否都跟随——拖拽就是移动框
   });
   board.addEventListener('pointerup', (e) => {
-    if (!dragStart || (!reorgMode && !hammerMode)) return;   // v5.9(本地): 锤子模式同款
+    if (!dragStart || (!reorgMode && !hammerMode)) return;   // v5.9: 锤子模式同款
     const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
     dragStart = null;
     // v4.9.15: 松手释放指针捕获——否则后续在「确认整理」按钮上的点击事件会被重定向到棋盘,按钮收不到（"点不动"根因）
@@ -2267,7 +2282,7 @@ const EMOJI_IMGS = [
         if (reorgLeft <= 0) return;
         doReorg(hoverSel || reorgFrame(Math.floor(COLS / 2), Math.floor(ROWS / 2)));
       } else {
-        // v5.9(本地): 锤子——点一下棋盘即砸当前 1×1 框
+        // v5.9: 锤子——点一下棋盘即砸当前 1×1 框
         if (hammerLeft <= 0) return;
         const sel = hammerSel || { c0: Math.floor(COLS / 2), c1: Math.floor(COLS / 2), r0: Math.floor(ROWS / 2), r1: Math.floor(ROWS / 2) };
         doHammer(sel.c0, sel.r0);
