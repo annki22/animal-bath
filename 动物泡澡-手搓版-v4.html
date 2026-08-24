@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9.15</title>
+  <title>动物泡澡 · 手搓版 v5.9.16</title>
+<!-- v5.9.16（2026-08-24）：埋点弱网防丢（内测发现弱网窗口事件丢失）——evtFlush 失败不再静默丢：批放回队列头保持时序，指数退避 5s/10s/20s/40s/60s 重试（_r 上限 5 次超限才丢弃）；pagehide 兜底失败落 localStorage（animalBathPendingEvents，上限 200 条）下次打开补报成功才清；发送前 stripEvtMeta 剥离 _r/_t 内部字段防 PostgREST 整批 400。副作用：补报事件 created_at 为补报时刻非原始时刻 -->
 <!-- v5.9.15（2026-08-24）：锤子砸掉后自动合成（安琪反馈「砸了之后掉下来的没自动合成」）——doHammer 砸掉一颗后，被砸列整列下移，所有新形成的相邻相同（列内砸口上下/左右列同行）自动连锁合成，与落子同规则同计分；不用全盘扫描，别处相邻大数字不受影响 -->
 <!-- v5.9.14（2026-08-24）：锤子音效改清脆（安琪要求）——砸碎音从 200Hz 闷响改 1100Hz 短促方波敲击 + 700Hz 轻共鸣尾音 -->
 <!-- v5.9.13（2026-08-24）：锤子改为不可逆道具（安琪拍板：用完锤子后禁撤回）——doHammer 生效时清空撤销栈，锤子前的落子不可再撤回（防"砸完→撤回→重砸"白嫖），锤子后的新落子照常可撤；撤回不再退还锤子次数（锤子前快照已清） -->
@@ -460,7 +461,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.15</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.16</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -516,7 +517,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.9.15 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.9.16 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -588,7 +589,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.9.15';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
+const VER = 'v5.9.16';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -1731,9 +1732,9 @@ const EMOJI_IMGS = [
       sbFetch('events', {   // v5.8: 走 sbFetch 统一拿 8s 超时，防埋点挂起占连接
         method: 'POST',
         headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify(batch)
-      }).catch(() => {});
-    } catch (e) {}
+        body: JSON.stringify(batch.map(stripEvtMeta))
+      }).catch(() => retryBatch(batch));   // v5.9.16: 失败不再静默丢——放回队列重试
+    } catch (e) { retryBatch(batch); }
   }
 
   function trackEvent(event, payload){
@@ -1744,18 +1745,63 @@ const EMOJI_IMGS = [
     } catch (e) {}
   }
 
+  // v5.9.16: 弱网防丢——flush 失败把事件放回队列头（保持时序），指数退避重试；超 5 次丢弃防死循环
+  // （2026-08-24 实测教训：网络抖动时 saves 靠 3s 防抖持续重试能写入，events flush 失败即丢全没了）
+  let evtRetryTimer = null;
+  function retryBatch(batch){
+    const alive = batch.filter(e => (e._r || 0) < 5);
+    if (!alive.length){ try { console.warn('[evt] 埋点重试超限丢弃', batch.length, '条'); } catch (e) {} return; }
+    const retried = alive.map(e => Object.assign({}, e, { _r: (e._r || 0) + 1 }));
+    evtQueue = retried.concat(evtQueue);
+    const delay = Math.min(60000, 5000 * Math.pow(2, retried[0]._r - 1));   // 5s/10s/20s/40s/60s
+    if (evtRetryTimer) clearTimeout(evtRetryTimer);
+    evtRetryTimer = setTimeout(evtFlush, delay);
+  }
+
+  // 剥离内部字段（_r 重试计数 / _t 落盘时间戳）——PostgREST 遇未知列会整批 400
+  function stripEvtMeta(e){
+    const c = Object.assign({}, e);
+    delete c._r; delete c._t;
+    return c;
+  }
+
+  // v5.9.16: 关页兜底也失败 → 存 localStorage，下次打开补报（保底不丢）
+  const EVT_PENDING_KEY = 'animalBathPendingEvents';
+  function persistPending(batch){
+    try {
+      const old = JSON.parse(localStorage.getItem(EVT_PENDING_KEY) || '[]');
+      const now = Date.now();
+      const merged = old.concat(batch.map(e => Object.assign({}, e, { _t: now })));
+      localStorage.setItem(EVT_PENDING_KEY, JSON.stringify(merged.slice(-200)));   // 上限 200 条防爆
+    } catch (e) {}
+  }
+  function flushPending(){
+    try {
+      const raw = localStorage.getItem(EVT_PENDING_KEY);
+      if (!raw) return;
+      const pending = JSON.parse(raw);
+      if (!pending.length){ localStorage.removeItem(EVT_PENDING_KEY); return; }
+      sbFetch('events', {
+        method: 'POST',
+        headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
+        body: JSON.stringify(pending.map(stripEvtMeta))
+      }).then(() => localStorage.removeItem(EVT_PENDING_KEY)).catch(() => {});   // 成功才清，失败留待下次
+    } catch (e) {}
+  }
+
   // 页面关闭/隐藏：keepalive 兜底最后一批（带 apikey 头，sendBeacon 做不到）
   window.addEventListener('pagehide', () => {
-    if (!evtQueue.length) return;
+    const batch = evtQueue; evtQueue = [];
+    if (evtTimer){ clearTimeout(evtTimer); evtTimer = null; }
+    if (!batch.length) return;
     try {
-      const batch = evtQueue; evtQueue = [];
       fetch(SUPABASE_URL + '/rest/v1/events', {
         method: 'POST',
         headers: Object.assign({}, SB_HEADERS, { 'Prefer': 'return=minimal' }),
-        body: JSON.stringify(batch),
+        body: JSON.stringify(batch.map(stripEvtMeta)),
         keepalive: true
-      }).catch(() => {});
-    } catch (e) {}
+      }).catch(() => persistPending(batch));
+    } catch (e) { persistPending(batch); }
   });
 
   // 本局存档（续玩）：本地立即写，云端防抖 3 秒
@@ -2162,6 +2208,7 @@ const EMOJI_IMGS = [
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.9.16', '2026-08-24', '更新埋点系统'],
     ['v5.9.15', '2026-08-24', '锤子砸掉后自动合成：砸掉的棋子上方落下来形成相同相邻时，像正常落子一样自动合并'],
     ['v5.9.14', '2026-08-24', '锤子音效更清脆：砸碎改成高频短促敲击声'],
     ['v5.9.13', '2026-08-24', '锤子改为不可逆道具：用完锤子后禁撤回，砸掉的结果不可反悔（锤子后的新落子照常可撤）'],
@@ -2364,6 +2411,7 @@ const EMOJI_IMGS = [
   //  拖拽中移出棋盘框停最后位置,移回棋盘 pointermove 继续跟随;确认/取消由 setReorgMode 统一清理
 
   showNameOverlay();   // 启动：先登录昵称（有存档可继续上一局）
+  flushPending();   // v5.9.16: 补报上次关闭时没发出去的埋点（弱网保底）
   trackEvent('page_view', { ua: (navigator.userAgent || '').slice(0, 120) });   // v5.4: 页面访问埋点（放最后确保 DOM 就绪）
 })();
 </script>
