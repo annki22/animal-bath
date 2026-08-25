@@ -153,35 +153,16 @@
   const HDR = { apikey: KEY, Authorization: 'Bearer ' + KEY };
 
   const $ = id => document.getElementById(id);
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
-  // ---------- 访问口令（只给自己看，前端简单校验 + localStorage 记住） ----------
-  const DASH_PASS = 'bath2026';           // ← 想改口令改这里
-  const LOCK_KEY = 'ab_dash_unlock';
+  // 前端口令无法构成鉴权；访问控制应由服务端/RPC 与数据库策略承担。
   function unlock() {
     $('lock').style.display = 'none';
     $('state').style.display = 'block';
     main();
   }
   (function initLock() {
-    if (localStorage.getItem(LOCK_KEY) === '1') {
-      $('lock').style.display = 'none';
-      $('state').style.display = 'block';
-      main();          // 已解锁也必须启动加载——否则永远卡「数据加载中…」
-      return;
-    }
-    const tryUnlock = () => {
-      if ($('lockInput').value.trim() === DASH_PASS) {
-        localStorage.setItem(LOCK_KEY, '1');
-        $('lock').style.display = 'none';
-        $('state').style.display = 'block';
-        main();
-      } else {
-        $('lockErr').textContent = '口令不对';
-      }
-    };
-    $('lockBtn').addEventListener('click', tryUnlock);
-    $('lockInput').addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
-    $('lockInput').focus();
+    unlock();
   })();
 
   async function fetchAll(table, select, orderCol) {
@@ -282,7 +263,7 @@
       const bh = v ? Math.max(2, ih * v / maxV) : 0;
       const bx = L + i * bw + bw * 0.18;
       out += `<rect x="${bx}" y="${T + ih - bh}" width="${bw * 0.64}" height="${bh}" class="${color}"/>`;
-      out += `<text x="${bx + bw * 0.32}" y="${H - 8}" class="lbl" text-anchor="middle">${labels[i]}</text>`;
+      out += `<text x="${bx + bw * 0.32}" y="${H - 8}" class="lbl" text-anchor="middle">${escapeHtml(labels[i])}</text>`;
       if (v > 0 && labels[i].length <= 4) out += `<text x="${bx + bw * 0.32}" y="${T + ih - bh - 4}" class="lbl" text-anchor="middle">${v}</text>`;
     });
     el.innerHTML = out;
@@ -306,8 +287,8 @@
     const durTxt = dur == null ? '—' : dur >= 60 ? `${Math.floor(dur / 60)}m${String(Math.round(dur % 60)).padStart(2, '0')}s` : `${dur}s`;
 
     // 道具使用（撤回/整理）
-    const undo = (agg.powerUse && agg.powerUse.undo) || 0;
-    const reorg = (agg.powerUse && agg.powerUse.reorg) || 0;
+    const undo = Number(agg.powerUse && agg.powerUse.undo) || 0;
+    const reorg = Number(agg.powerUse && agg.powerUse.reorg) || 0;
     const powerTotal = undo + reorg;
 
     // 结束原因（当前只有 overflow=越线）
@@ -328,25 +309,25 @@
       { label: '越线结束', num: overflowPct == null ? '—' : overflowPct + '%', extra: '唯一结束方式' },
     ];
     $('evKpis').innerHTML = kpis.map(k =>
-      `<div class="kpi"><div class="label">${k.label}</div><div class="num">${k.num}</div><div class="extra">${k.extra}</div></div>`
+      `<div class="kpi"><div class="label">${escapeHtml(k.label)}</div><div class="num">${escapeHtml(k.num)}</div><div class="extra">${escapeHtml(k.extra)}</div></div>`
     ).join('');
 
     // 留存表：cohort(首玩日) / 玩家数 / D+1 / D+3 / D+7 回访率
     const ret = agg.retention || [];
     const pct = (n, tot) => tot ? Math.round(100 * n / tot) + '%' : '—';
     $('retTable').querySelector('tbody').innerHTML = ret.length ? ret.map(r =>
-      `<tr><td>${r.cohort}</td><td class="num">${r.players}</td><td class="num">${pct(r.d1, r.players)}</td><td class="num">${pct(r.d3, r.players)}</td><td class="num">${pct(r.d7, r.players)}</td></tr>`
+      `<tr><td>${escapeHtml(r.cohort)}</td><td class="num">${escapeHtml(r.players)}</td><td class="num">${escapeHtml(pct(r.d1, r.players))}</td><td class="num">${escapeHtml(pct(r.d3, r.players))}</td><td class="num">${escapeHtml(pct(r.d7, r.players))}</td></tr>`
     ).join('') : `<tr><td colspan="5" style="color:var(--sub)">等待数据积累…</td></tr>`;
 
     // 局内行为明细
     const reasonLines = Object.entries(reason).map(([k, v]) => {
       const label = k === 'overflow' ? '越线' : k;
-      return `${label} ${v} 局${reasonTotal ? '（' + Math.round(100 * v / reasonTotal) + '%）' : ''}`;
+      return `${escapeHtml(label)} ${escapeHtml(v)} 局${reasonTotal ? '（' + Math.round(100 * v / reasonTotal) + '%）' : ''}`;
     }).join('<br>') || '暂无';
     $('evBehavior').innerHTML = `
-      <div><b>道具使用</b> 撤回 ${undo} 次 · 整理 ${reorg} 次</div>
+      <div><b>道具使用</b> 撤回 ${escapeHtml(undo)} 次 · 整理 ${escapeHtml(reorg)} 次</div>
       <div><b>结束方式</b><br>${reasonLines}</div>
-      <div style="color:var(--sub);font-size:11px;margin-top:6px">样本 ${agg.total} 条事件 · 覆盖 ${(agg.byDay || []).length} 天</div>
+      <div style="color:var(--sub);font-size:11px;margin-top:6px">样本 ${escapeHtml(agg.total)} 条事件 · 覆盖 ${escapeHtml((agg.byDay || []).length)} 天</div>
     `;
   }
 
@@ -439,9 +420,19 @@
       // ---------- 玩家榜 ----------
       const sorted = Object.entries(nickBest).sort((a, b) => b[1].score - a[1].score);
       const medals = ['🥇', '🥈', '🥉'];
-      $('playerTable').querySelector('tbody').innerHTML = sorted.slice(0, 30).map(([nick, b], i) =>
-        `<tr><td class="rank">${medals[i] || i + 1}</td><td>${nick}</td><td class="num">${b.games}</td><td class="num">${fmt(b.score)}</td><td class="num">${b.max_level}</td><td class="num">${b.last}</td></tr>`
-      ).join('');
+      const playerBody = $('playerTable').querySelector('tbody');
+      playerBody.replaceChildren();
+      sorted.slice(0, 30).forEach(([nick, b], i) => {
+        const tr = document.createElement('tr');
+        [medals[i] || i + 1, nick, b.games, fmt(b.score), b.max_level, b.last].forEach((value, col) => {
+          const td = document.createElement('td');
+          if (col === 0) td.className = 'rank';
+          if (col >= 2) td.className = 'num';
+          td.textContent = String(value);
+          tr.appendChild(td);
+        });
+        playerBody.appendChild(tr);
+      });
       $('subLine').textContent = `scores ${scores.length} 条 · saves ${saves.length} 条 · 本地聚合`;
 
       // ---------- 埋点洞察（独立容错，RPC 未建/失败不影响主看板） ----------
@@ -450,12 +441,21 @@
         renderEvents(agg);
       } catch (err) {
         $('eventsCard').style.display = 'block';
-        $('evKpis').innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px">埋点聚合暂不可用（${err.message}）— 若已建 RPC 请刷新；未建则不影响其他数据。</div>`;
+        $('evKpis').replaceChildren();
+        const msg = document.createElement('div');
+        msg.style.cssText = 'grid-column:1/-1;font-size:12px;color:var(--sub);padding:6px 2px';
+        msg.textContent = `埋点聚合暂不可用（${err.message}）— 若已建 RPC 请刷新；未建则不影响其他数据。`;
+        $('evKpis').appendChild(msg);
         $('retTable').querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:var(--sub)">—</td></tr>`;
         $('evBehavior').innerHTML = '—';
       }
     } catch (e) {
-      $('state').innerHTML = `<div class="err">数据加载失败：${e.message}<br><br>请确认网络可访问 supabase.co，或稍后重试。</div>`;
+      $('state').replaceChildren();
+      const msg = document.createElement('div');
+      msg.className = 'err';
+      msg.textContent = `数据加载失败：${e.message}\n\n请确认网络可访问 supabase.co，或稍后重试。`;
+      msg.style.whiteSpace = 'pre-line';
+      $('state').appendChild(msg);
     }
   }
 })();

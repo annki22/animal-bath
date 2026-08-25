@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9.16</title>
+  <title>动物泡澡 · 手搓版 v5.9.18</title>
+<!-- v5.9.18（2026-08-26）：修复越线救场三个高危 bug——救场可能永久卡死（有撤回次数但无快照栈时）、救场弹窗打开时键盘仍能投子、旧局异步回调错误解锁新局；看板修复存储型 XSS 并移除明文口令。-->
+<!-- v5.9.17（2026-08-25）：修复锤子砸多点后掉下来的相邻没合成（安琪反馈「列2 10和11中间那颗，砸了掉下来相邻要合成」）——根因=v5.9.15 的 doHammer 只把砸口一格 (col,row) 作 settleMerge 初始键，settleMerge 只在"发生合成后"才扫删除位置的下移链：当砸口格本身没邻居可合成时，砸口上方整段下移的同值相邻永远不会被扫到→漏合成。实测 col2=[10,5,6,11] 砸5→[10,6,11]，col3 同行 11 却不合。正解=initKeys 覆盖"砸口 + 砸口上方全部格子"（这些才因 splice 动过、是合法变化位置）；砸口下方没动的一律不传，防 v5.9.15"安静的[1,1]被误扫合成"旧坑 -->
 <!-- v5.9.16（2026-08-24）：埋点弱网防丢（内测发现弱网窗口事件丢失）——evtFlush 失败不再静默丢：批放回队列头保持时序，指数退避 5s/10s/20s/40s/60s 重试（_r 上限 5 次超限才丢弃）；pagehide 兜底失败落 localStorage（animalBathPendingEvents，上限 200 条）下次打开补报成功才清；发送前 stripEvtMeta 剥离 _r/_t 内部字段防 PostgREST 整批 400。副作用：补报事件 created_at 为补报时刻非原始时刻 -->
 <!-- v5.9.15（2026-08-24）：锤子砸掉后自动合成（安琪反馈「砸了之后掉下来的没自动合成」）——doHammer 砸掉一颗后，被砸列整列下移，所有新形成的相邻相同（列内砸口上下/左右列同行）自动连锁合成，与落子同规则同计分；不用全盘扫描，别处相邻大数字不受影响 -->
 <!-- v5.9.14（2026-08-24）：锤子音效改清脆（安琪要求）——砸碎音从 200Hz 闷响改 1100Hz 短促方波敲击 + 700Hz 轻共鸣尾音 -->
@@ -461,7 +463,7 @@
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.16</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.18</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -517,7 +519,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.9.16 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
+      <div class="ver" id="verLink" title="查看更新说明">v5.9.18 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -589,7 +591,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.9.16';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
+const VER = 'v5.9.18';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -960,6 +962,14 @@ const EMOJI_IMGS = [
   //  撤回次数不退还（一次消耗品，否则等于无限撤回）；快照不存 undoLeft。
   const UNDO_MAX = 8;   // 栈上限：撤回次数只有 2，只留最近几步就够，防内存膨胀
 
+  function canUseUndo(){
+    return undoLeft > 0 && undoStack.length > 0;
+  }
+
+  function canRescue(){
+    return reorgLeft > 0 || hammerLeft > 0 || canUseUndo();
+  }
+
   function pushUndo(){
     undoStack.push({
       stacks: stacks.map(col => col.slice()),
@@ -976,7 +986,7 @@ const EMOJI_IMGS = [
   function doUndo(){
     if (!running || busy) return;
     if (reorgMode || hammerMode) return;   // 整理/锤子模式中禁撤回（先取消框选）
-    if (undoLeft <= 0 || !undoStack.length){ beep(150, 0.15, 'square', 0.08); return; }   // 无次数/无快照：低音提示
+    if (!canUseUndo()){ beep(150, 0.15, 'square', 0.08); rescueCheck(); return; }   // 无次数/无快照：低音提示；救场中重新给出放弃出口
     const s = undoStack.pop();
     stacks = s.stacks;
     score = s.score;
@@ -1109,7 +1119,7 @@ const EMOJI_IMGS = [
     if (!running || busy) return;
     if (hammerLeft <= 0) return;
     const s = stacks[col];
-    if (!s || row >= s.length){ beep(150, 0.15, 'square', 0.08); return; }   // 框住的格子没有棋子：保持锤子模式可重选
+    if (!s || row >= s.length){ beep(150, 0.15, 'square', 0.08); rescueCheck(); return; }   // 框住的格子没有棋子：救场中重新给出放弃出口
     const lv = s[row];
     // v5.9.13: 锤子改为不可逆道具（安琪拍板：用完锤子后禁撤回）——清空撤销栈，锤子前的落子不可再撤回
     //（防"砸完→撤回→重砸"白嫖；锤子砸掉后连锁下落/合成的结果不可反悔）；锤子之后的新落子照常可撤
@@ -1126,8 +1136,17 @@ const EMOJI_IMGS = [
     // 下方=砸口另一侧、上方=落下的原棋子、左右=同层新邻居），后续连锁由 settleMerge 的下移链扫描自动传播。
     // ⚠️ 不能把全列都作起点（实测 v5.9.15 初版）：会把"本来就没动过的相邻"（如安静的 [1,1]）也扫出来合成，
     // 违反"合成只发生在变化/掉落位置附近"的核心规则
+    // v5.9.17: fix 锤子下落合成漏检——initKeys 不能只传砸口一格。
+    // 砸掉后，砸口位置被原上方棋子补位，且砸口上方的所有棋子整体下移一格，
+    // 它们的新位置都可能与左右列同行产生新相邻（合成），但 settleMerge 只在
+    // "发生了合成"后才扫删除位置的下移链——若砸口格本身不合成，链永远不被扫，
+    // 上方下移的同值相邻就会漏合成（实测：col2=[10,5,6,11] 砸5 → [10,6,11]，col3
+    // 同行 11 却不合）。正解=initKeys 覆盖"砸口 + 砸口上方全部格子"（这些才因 splice
+    // 动过，是合法变化位置）；砸口下方没动的绝不传（防把安静的 [1,1] 误合成，v5.9.15 旧坑）。
+    const stack = stacks[col];
     const myGen = gen;
-    const initKeys = new Set([col + ',' + row]);
+    const initKeys = new Set();
+    for (let rr = row; rr < stack.length; rr++) initKeys.add(col + ',' + rr);
     setTimeout(async () => {
       try {
         await settleMerge(col, myGen, initKeys);
@@ -1135,9 +1154,9 @@ const EMOJI_IMGS = [
         console.error('hammer settleMerge error:', e);
         render();  // 异常时兜底：重建棋盘，避免状态错乱
       } finally {
+        if (myGen !== gen) return;   // 局已换：checkGameOver/saveGame 都归新局管
         busy = false;
         updatePowerUI();
-        if (myGen !== gen) return;   // 局已换：checkGameOver/saveGame 都归新局管
         if (rescueMode) rescueCheck();   // v5.9: 救场中砸完（含合成落定后）检查是否解除越线
         else checkGameOver();
         if (running) saveGame();   // 合成结果落定后存档
@@ -1181,10 +1200,12 @@ const EMOJI_IMGS = [
       saveGame();
       return;
     }
-    // 没解除：道具还有就继续救，道具用尽直接结算
-    if (reorgLeft <= 0 && undoLeft <= 0 && hammerLeft <= 0){
+    // 没解除：道具用尽直接结算；仍有可用道具则重开弹窗，始终保留“放弃结束”出口
+    if (!canRescue()){
       setRescueMode(false);
       doGameOver(gen, 'overflow');
+    } else {
+      showRescueOverlay();
     }
   }
 
@@ -1192,7 +1213,7 @@ const EMOJI_IMGS = [
   function showRescueOverlay(){
     const powers = [];
     if (reorgLeft > 0) powers.push('🧹 整理 ×' + reorgLeft);
-    if (undoLeft > 0) powers.push('↩ 撤回 ×' + undoLeft);
+    if (canUseUndo()) powers.push('↩ 撤回 ×' + undoLeft);
     if (hammerLeft > 0) powers.push('🔨 锤子 ×' + hammerLeft);
     document.getElementById('rescuePowers').textContent = powers.join('　·　');
     rescueOverlay.classList.add('show');
@@ -1381,7 +1402,7 @@ const EMOJI_IMGS = [
   async function doReorg(sel){
     if (!running || busy) return;
     if (reorgLeft <= 0) return;
-    if (!reorgApply(sel)){ beep(150, 0.15, 'square', 0.08); return; }   // 区域无效：保持整理模式可重选
+    if (!reorgApply(sel)){ beep(150, 0.15, 'square', 0.08); rescueCheck(); return; }   // 区域无效：救场中重新给出放弃出口
     trackEvent('power_use', { type: 'reorg', left: reorgLeft - 1 });   // v5.4: 道具埋点（reorgApply 已消耗次数）
     setReorgMode(false);
     busy = true;
@@ -1422,19 +1443,19 @@ const EMOJI_IMGS = [
         }
       }
     } finally {
+      if (myGen !== gen) return;
       busy = false;
       updatePowerUI();
-      if (myGen === gen){
-        if (rescueMode) rescueCheck();   // v5.9: 救场中整理后检查是否解除越线
-        else checkGameOver();
-        if (running) saveGame();
-      }
+      if (rescueMode) rescueCheck();   // v5.9: 救场中整理后检查是否解除越线
+      else checkGameOver();
+      if (running) saveGame();
     }
   }
 
   // ===== 投放（点击列） =====
   function drop(colIdx){
     if (!running) return;
+    if (rescueOverlay.classList.contains('show') || dupOverlay.classList.contains('show')) return;
     if (busy) return;   // v4.9.6: 合成动画未完成时点击不投放（推翻 v4.9 排队补投——动画结束自动投出非玩家预期）
     if (reorgMode) return;   // v4.10.0: 整理模式中禁投放
     if (hammerMode || rescueMode) return;   // v5.9: 锤子模式/救场模式中禁投放
@@ -1466,9 +1487,9 @@ const EMOJI_IMGS = [
         console.error('settleMerge error:', e);
         render();  // 异常时兜底：重建棋盘，避免状态错乱
       } finally {
+        if (myGen !== gen) return;   // 局已换：checkGameOver/saveGame 都归新局管
         busy = false;  // 无论合成是否正常完成，都解锁投放，防止卡死
         updatePowerUI();   // v4.10.0: 动画结束恢复道具可用
-        if (myGen !== gen) return;   // 局已换：checkGameOver/saveGame 都归新局管
         // v4.9.14-r5: 恢复最初逻辑——不再在合成后替换队尾（那会导致 next2 预览每次合成后重新抽，数字乱跳）。
         //  nextQueue 在 drop 开头 shift+push 时已定死，合成完成后只刷新预览显示，不动队列
         renderNext();
@@ -1659,8 +1680,7 @@ const EMOJI_IMGS = [
     const myGen = gen;   // v4.9: 记录局号——等待提交期间开了新局，就不再弹结算榜
     if (!isOverflow()) return;
     // v5.9: 超线不再直接结束——有道具先弹救场确认框（防误触/给道具救场机会）
-    const canRescue = (reorgLeft > 0) || (undoLeft > 0) || (hammerLeft > 0);
-    if (canRescue && !rescueMode){
+    if (canRescue() && !rescueMode){
       showRescueOverlay();
       return;   // 等玩家选择，不结算
     }
@@ -1925,8 +1945,7 @@ const EMOJI_IMGS = [
     trackEvent('game_start', { continue: true });   // v5.4: 续玩埋点
     // v5.9: 续玩恢复的棋盘若已越线（救场中强退留下的存档）——有道具弹救场，没道具直接结算
     if (isOverflow()){
-      const canRescue = (reorgLeft > 0) || (undoLeft > 0) || (hammerLeft > 0);
-      if (canRescue) showRescueOverlay();
+      if (canRescue()) showRescueOverlay();
       else doGameOver(gen, 'overflow');
     }
   }
@@ -2202,12 +2221,14 @@ const EMOJI_IMGS = [
   document.addEventListener('keydown', (e) => {
     if (!/^[1-5]$/.test(e.key)) return;
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-    if (nameOverlay.classList.contains('show') || rankOverlay.classList.contains('show') || updOverlay.classList.contains('show')) return;
+    if (document.querySelector('.overlay.show')) return;
     drop(parseInt(e.key, 10) - 1);
   });
 
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v5.9.18', '2026-08-26', '修复越线救场：救场时可能卡死、按键盘还会误落子，现在都修好了'],
+    ['v5.9.17', '2026-08-25', '修复锤子：砸掉棋子上方落下来、和旁边的相同数字挨着时，现在会自动合成了'],
     ['v5.9.16', '2026-08-24', '更新埋点系统'],
     ['v5.9.15', '2026-08-24', '锤子砸掉后自动合成：砸掉的棋子上方落下来形成相同相邻时，像正常落子一样自动合并'],
     ['v5.9.14', '2026-08-24', '锤子音效更清脆：砸碎改成高频短促敲击声'],
@@ -2409,6 +2430,30 @@ const EMOJI_IMGS = [
   });
   // v4.10.1: 鼠标离开棋盘不再清框——v4.9.15 改:鼠标移出去点「确认整理」时框必须保留（用户诉求"框选后定住"）；
   //  拖拽中移出棋盘框停最后位置,移回棋盘 pointermove 继续跟随;确认/取消由 setReorgMode 统一清理
+
+  // 仅本地开发服务器暴露最小测试钩子，便于 CDP 验证跨局异步锁；线上域名不可用。
+  if (location.hostname === '127.0.0.1' || location.hostname === 'localhost'){
+    window.__animalBathTest = {
+      getState: () => ({ busy, gen, running, stacks: stacks.map(col => col.slice()), undoLeft, undoDepth: undoStack.length, reorgLeft, hammerLeft, rescueMode }),
+      setBusy: value => { busy = Boolean(value); },
+      startNewGame,
+      drop,
+      doUndo,
+      doReorg,
+      doHammer,
+      setState: state => {
+        if (state.stacks) stacks = state.stacks.map(col => col.slice());
+        if (state.nextQueue) nextQueue = state.nextQueue.slice();
+        if (state.reorgLeft !== undefined) reorgLeft = state.reorgLeft;
+        if (state.undoLeft !== undefined) undoLeft = state.undoLeft;
+        if (state.hammerLeft !== undefined) hammerLeft = state.hammerLeft;
+        if (state.undoStack) undoStack = state.undoStack;
+        running = state.running !== undefined ? state.running : true;
+        busy = Boolean(state.busy);
+        updatePowerUI(); render(); renderNext(); fitBoard();
+      }
+    };
+  }
 
   showNameOverlay();   // 启动：先登录昵称（有存档可继续上一局）
   flushPending();   // v5.9.16: 补报上次关闭时没发出去的埋点（弱网保底）
