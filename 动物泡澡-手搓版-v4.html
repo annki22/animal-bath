@@ -2,8 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>动物泡澡 · 手搓版 v5.9.18</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>动物泡澡 · 手搓版 v6.0</title>
+<!-- v6.0（2026-08-26）：皮肤重设计——Apple 极简×清透浴水×低饱和（静态视觉焕新；棋子颜色分级、合成/掉落特效与手感保持线上 v5.9.18 原版）；道具新增说明卡（首次点击先解释再确认）；登录页背景棋盘小屏适配。-->
 <!-- v5.9.18（2026-08-26）：修复越线救场三个高危 bug——救场可能永久卡死（有撤回次数但无快照栈时）、救场弹窗打开时键盘仍能投子、旧局异步回调错误解锁新局；看板修复存储型 XSS 并移除明文口令。-->
 <!-- v5.9.17（2026-08-25）：修复锤子砸多点后掉下来的相邻没合成（安琪反馈「列2 10和11中间那颗，砸了掉下来相邻要合成」）——根因=v5.9.15 的 doHammer 只把砸口一格 (col,row) 作 settleMerge 初始键，settleMerge 只在"发生合成后"才扫删除位置的下移链：当砸口格本身没邻居可合成时，砸口上方整段下移的同值相邻永远不会被扫到→漏合成。实测 col2=[10,5,6,11] 砸5→[10,6,11]，col3 同行 11 却不合。正解=initKeys 覆盖"砸口 + 砸口上方全部格子"（这些才因 splice 动过、是合法变化位置）；砸口下方没动的一律不传，防 v5.9.15"安静的[1,1]被误扫合成"旧坑 -->
 <!-- v5.9.16（2026-08-24）：埋点弱网防丢（内测发现弱网窗口事件丢失）——evtFlush 失败不再静默丢：批放回队列头保持时序，指数退避 5s/10s/20s/40s/60s 重试（_r 上限 5 次超限才丢弃）；pagehide 兜底失败落 localStorage（animalBathPendingEvents，上限 200 条）下次打开补报成功才清；发送前 stripEvtMeta 剥离 _r/_t 内部字段防 PostgREST 整批 400。副作用：补报事件 created_at 为补报时刻非原始时刻 -->
@@ -54,6 +55,12 @@
     position: relative; overflow: hidden;
   }
 
+  /* 手机端延伸游戏背景到屏幕顶端，内容仍从状态栏安全区下方开始。 */
+  @media (max-width: 600px) {
+    body { align-items: flex-start; }
+    .game { padding-top: env(safe-area-inset-top, 0px); }
+  }
+
   /* ===== 顶部 ===== */
   .topbar {
     display: flex; align-items: flex-start; justify-content: space-between;
@@ -64,7 +71,7 @@
   .title small { display: block; font-size: 11px; font-weight: 500; color: #9AA0A8; letter-spacing: 2px; margin-top: 2px; }
   .title small em { font-style: normal; color: #FF7B93; font-weight: 700; }
   .ver { font-size: 10px; color: #B8BEC6; letter-spacing: 1px; margin-top: 6px; }
-  .scorebox { text-align: right; }
+  .scorebox { position: relative; text-align: right; }
   .score-label { font-size: 10px; color: #9AA0A8; letter-spacing: 1px; }
   .score { font-size: 26px; font-weight: 800; color: #2F3542; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .best { font-size: 11px; color: #B8BEC6; margin-top: 2px; }
@@ -81,7 +88,7 @@
     display: flex; align-items: center; justify-content: center;
     position: relative;
   }
-  .next-slot.current { background: #FFF6DE; box-shadow: inset 0 0 0 2px #FFD75E; }
+  .next-slot.current { background: #FFF6DE; box-shadow: none; }
   /* 预览区方块：独立正方形尺寸，不受棋盘 --tile 影响 */
   /* v4.9.14: 当前方块放大 78%、第二个缩小 50%——当前要落的动物一眼看清 */
   /* v4.9.14-r2: 去掉 popIn 动画——每次 renderNext 重建 tile 会重放动画导致闪烁 */
@@ -116,8 +123,8 @@
       radial-gradient(circle at 30% 68%, rgba(255,255,255,.4) 0 4px, transparent 5.5px),
       radial-gradient(circle at 88% 62%, rgba(255,255,255,.3) 0 3px, transparent 4px),
       linear-gradient(180deg, #E8F6FA 0%, #D6ECF1 100%);
-    border-radius: 24px;
-    border: 3px solid #CBE4EA;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(93,151,166,.15);
     overflow: hidden;
   }
   /* v4.9.3: 列布局从均分撑满改为收缩居中——列宽=方块宽、列间距=行间距(var(--gap))，行列视觉间距一致 */
@@ -245,7 +252,7 @@
     align-items: center;
     cursor: pointer;
     transition: background .12s;
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
   }
   .col:active { background: rgba(255,255,255,0.3); }
   /* 棋子堆：从底部往上堆，栈顶在最上 */
@@ -395,7 +402,7 @@
     border-radius: 50%;
     background: radial-gradient(circle at 32% 30%, rgba(255,255,255,.95), rgba(255,255,255,.18) 45%, rgba(255,255,255,.05));
     border: 1px solid rgba(255,255,255,.65);
-    box-shadow: inset 0 -2px 3px rgba(255,255,255,.35);
+    box-shadow: none;
     pointer-events: none;
     animation: bubbleUp 1.1s ease-out forwards;
   }
@@ -408,23 +415,51 @@
   /* ===== 结束遮罩 ===== */
   .overlay {
     position: absolute; inset: 0; z-index: 40;
-    background: rgba(47,53,66,0.45); backdrop-filter: blur(6px);
+    background: rgba(25,30,32,.20);
     display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none; transition: opacity .3s;
+    opacity: 0; pointer-events: none; transition: opacity 160ms ease-out;
   }
-  .overlay.show { opacity: 1; pointer-events: auto; }
+  .overlay.show { opacity: 1; pointer-events: auto; transition-duration: 220ms; }
   .modal {
-    background: #FFFFFF; border-radius: 28px;
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(31,35,38,.07);
+    border-radius: 22px;
     padding: 28px 32px; text-align: center;
-    transform: scale(.9); transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    opacity: 0; transform: translateY(8px) scale(.985);
+    transition: opacity 160ms ease-out, transform 160ms ease-out;
     width: 78%; max-width: 300px;
   }
-  .overlay.show .modal { transform: scale(1); }
+  .overlay.show .modal {
+    opacity: 1; transform: translateY(0) scale(1);
+    transition-duration: 220ms;
+  }
+  @supports ((backdrop-filter: blur(18px)) or (-webkit-backdrop-filter: blur(18px))) {
+    .modal {
+      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px);
+    }
+  }
   .modal .emoji { font-size: 52px; margin-bottom: 8px; }
   .modal h2 { font-size: 22px; font-weight: 800; color: #2F3542; margin-bottom: 4px; }
   .modal .sub { font-size: 13px; color: #9AA0A8; margin-bottom: 16px; }
   .modal .btn { width: 100%; padding: 13px; font-size: 15px; border-radius: 16px; }
   .btn.ghost { background: #E8E6E0; color: #6B7280; margin-top: 8px; }
+  /* 道具说明卡：复用全局遮罩，不改动道具栏几何 */
+  .power-modal { position: relative; overflow: hidden; }
+  .power-modal::before, .power-modal::after {
+    content: ''; position: absolute; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle at 30% 28%, rgba(255,255,255,.95), rgba(165,220,232,.18) 48%, rgba(165,220,232,.05));
+    border: 1px solid rgba(137,203,216,.24);
+  }
+  .power-modal::before { width: 62px; height: 62px; top: -24px; right: -18px; }
+  .power-modal::after { width: 30px; height: 30px; left: -9px; bottom: 54px; }
+  .power-modal .emoji { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: 34px; background: linear-gradient(145deg, #FFF8DA, #FFE7A2); box-shadow: none; }
+  .power-modal .power-count { display: inline-flex; align-items: center; gap: 5px; margin: 0 0 17px; padding: 5px 10px; border-radius: 999px; color: #7A6670; background: #FFF0F5; font-size: 12px; font-weight: 750; }
+  .power-modal .power-count b { color: #E65F8D; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .power-actions { display: flex; gap: 8px; }
+  .power-actions .btn { margin: 0; }
+  .power-actions .ghost { flex: .78; }
+  .power-actions .power-use { flex: 1.22; background: linear-gradient(145deg, #FF7FA8, #F05F91); box-shadow: none; }
   /* v5.9: 越线救场弹窗——剩余道具清单 */
   .rescue-powers { font-size: 13px; font-weight: 700; color: #3E7C8C; margin: -6px 0 14px; line-height: 1.8; }
 
@@ -433,7 +468,7 @@
   .name-input {
     width: 100%; padding: 12px 14px; margin-bottom: 12px;
     font-size: 15px; font-weight: 600; text-align: center;
-    border: 2px solid #E8E6E0; border-radius: 14px; outline: none;
+    border: 1px solid var(--border); border-radius: var(--radius-md); outline: none;
     background: #F8F7F4; color: #2F3542;
   }
   .name-input:focus { border-color: #7FB6C4; background: #fff; }
@@ -458,12 +493,242 @@
   .rank-summary .rs-level b { font-size: 26px; color: #F08C2E; font-weight: 800; font-variant-numeric: tabular-nums; }
   .rank-mine { font-size: 12px; color: #9AA0A8; margin-bottom: 10px; }
   .rank-loading { color: #9AA0A8; font-size: 13px; padding: 24px 0; }
+
+  /* ===== 静态视觉皮肤：Apple 极简 × 清透浴水 × 低饱和 ===== */
+  :root {
+    --bg-page: #F5F6F7;
+    --surface: #FFFFFF;
+    --surface-secondary: #F0F2F4;
+    --water-100: #EAF5F8;
+    --water-200: #DDEFF4;
+    --water-300: #C8E4EB;
+    --water-500: #70AEBE;
+    --water-700: #447986;
+    --text-primary: #202326;
+    --text-secondary: #686E73;
+    --text-tertiary: #989EA3;
+    --warning: #D99AA5;
+    --warning-text: #B97884;
+    --warning-bg: #FAECEF;
+    --border: rgba(31,35,38,.08);
+    --border-water: rgba(93,151,166,.16);
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", sans-serif;
+    background: var(--bg-page);
+    color: var(--text-primary);
+  }
+  .game { background: var(--bg-page); }
+
+  /* 标题与分数层级 */
+  .title {
+    color: var(--text-primary);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -.4px;
+  }
+  .title small {
+    margin-top: 4px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: .5px;
+  }
+  .title small em { color: inherit; font-weight: inherit; }
+  .score-label {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: .2px;
+  }
+  .score {
+    margin-top: 4px;
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -.6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .best {
+    margin-top: 4px;
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-weight: 500;
+  }
+  .best span {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .next-label, .who { color: var(--text-tertiary); }
+
+  /* 预览表面：只收敛容器，不改预览棋子 */
+  .next-slot {
+    background: rgba(255,255,255,.88);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  .next-slot.current {
+    background: var(--water-100);
+    border-color: rgba(80,145,160,.35);
+    box-shadow: none;
+  }
+  .cur-tag { color: var(--water-700); }
+
+  /* 浴缸与列识别 */
+  .board {
+    background: linear-gradient(180deg, rgba(234,245,248,.96) 0%, rgba(221,239,244,.92) 100%);
+    border: 1px solid rgba(93,151,166,.15);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+  }
+  .col-bg, .col-bg:nth-child(odd) {
+    background: rgba(255,255,255,.08);
+    border-right: 1px solid rgba(75,124,136,.07);
+    border-radius: 0;
+  }
+  .col-bg:last-child { border-right: 0; }
+  .col { border-radius: var(--radius-lg); }
+  .col:active { background: rgba(255,255,255,.22); }
+  .col .arrow {
+    color: #A3B8BE;
+    opacity: .75;
+  }
+  .col:hover .arrow, .col:active .arrow { color: #6096A3; }
+
+  /* 警戒线保留原位置，降低饱和度与视觉权重 */
+  .danger-line {
+    border-top: 1px dashed rgba(185,120,132,.55);
+    opacity: 1;
+  }
+  .danger-tag {
+    padding: 4px 8px;
+    background: rgba(250,236,239,.92);
+    color: var(--warning-text);
+    border: 1px solid rgba(185,120,132,.12);
+    border-radius: var(--radius-sm);
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .2px;
+  }
+
+  /* 道具与底部操作共用的轻量按钮语言 */
+  .btn {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+    transition: background 120ms ease-out, border-color 120ms ease-out, transform 120ms ease-out, opacity 120ms ease-out;
+  }
+  .btn:active { transform: scale(.96); }
+  .power-col .btn.power {
+    background: rgba(255,255,255,.88);
+    color: var(--text-secondary);
+    border: 1px solid rgba(31,35,38,.07);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  .power-col .btn.power:active { background: #F0F4F5; }
+  .power-col .btn.power:disabled {
+    opacity: .38;
+    cursor: default;
+    transform: none;
+  }
+  .power-col .btn.power.active {
+    background: #F0F4F5;
+    color: var(--water-700);
+    border-color: rgba(80,145,160,.35);
+  }
+  .power-col .btn.power.cancel {
+    background: rgba(255,255,255,.88);
+    color: var(--text-secondary);
+  }
+  .power-col .btn.power .badge {
+    background: #EEF1F2;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    font-size: 10px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .bottombar .btn-row .btn {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+  }
+  .bottombar .btn-row .btn:active { background: var(--surface-secondary); }
+  .bottombar .btn-row #restartBtn {
+    background: var(--water-100);
+    color: var(--water-700);
+    border-color: rgba(93,151,166,.14);
+  }
+  /* 泡泡仅作为水感暗示，保留原有生命周期动画 */
+  .bubble {
+    background: rgba(255,255,255,.34);
+    border: 1px solid rgba(255,255,255,.18);
+    box-shadow: none;
+    filter: opacity(.34);
+  }
+
+  /* 静态容器的圆角、描边与中性色 */
+  .modal {
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(31,35,38,.07);
+    border-radius: 22px;
+    box-shadow: none;
+  }
+  .modal h2, .rank-name, .rank-score { color: var(--text-primary); }
+  .modal .sub, .lock-tip, .rank-empty, .rank-mine, .rank-loading { color: var(--text-tertiary); }
+  .modal .btn { border-radius: var(--radius-md); box-shadow: none; }
+  .btn.ghost { background: var(--surface-secondary); color: var(--text-secondary); }
+  .power-modal::before, .power-modal::after {
+    background: rgba(234,245,248,.48);
+    border: 1px solid var(--border-water);
+  }
+  .power-modal .emoji {
+    background: var(--water-100);
+    border: 1px solid var(--border-water);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+  }
+  .power-modal .power-count {
+    background: var(--surface-secondary);
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+  }
+  .power-modal .power-count b { color: var(--water-700); }
+  .power-actions .power-use {
+    background: var(--water-100);
+    color: var(--water-700);
+    border-color: rgba(93,151,166,.14);
+    box-shadow: none;
+  }
+  .name-input {
+    background: var(--bg-page);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  .name-input:focus { background: var(--surface); border-color: rgba(80,145,160,.35); }
+  .name-input:disabled { opacity: .38; }
 </style>
 </head>
 <body>
 <div class="game" id="game">
   <div class="topbar">
-    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v5.9.18</em></small></div>
+    <div class="title">动物泡澡<small>ANIMAL BATH · 手搓版 · <em>v6.0</em></small></div>
     <div class="scorebox">
       <div class="score-label">本局洗浴值</div>
       <div class="score" id="score">0</div>
@@ -519,7 +784,7 @@
       <div class="emoji">🛁</div>
       <h2>动物泡澡</h2>
       <div class="sub">输入昵称，和朋友 PK 洗浴值</div>
-      <div class="ver" id="verLink" title="查看更新说明">v5.9.18 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
+      <div class="ver" id="verLink" title="查看更新说明">v6.0 · 五列 · 越线才结束 · 道具：整理/撤回/锤子</div>
       <input class="name-input" id="nameInput" maxlength="12" placeholder="你的昵称">
       <div class="lock-tip" id="lockTip" style="display:none">🔒 昵称已在此设备锁定</div>
       <button class="btn" id="nameStart">开始游戏</button>
@@ -561,6 +826,20 @@
     </div>
   </div>
 
+  <!-- 道具说明卡 -->
+  <div class="overlay" id="powerInfoOverlay" role="dialog" aria-modal="true" aria-labelledby="powerInfoTitle">
+    <div class="modal power-modal">
+      <div class="emoji" id="powerInfoEmoji">🧹</div>
+      <h2 id="powerInfoTitle">整理</h2>
+      <div class="sub" id="powerInfoDesc">选一个 3×3 区域，把里面的棋子从左到右、从大到小重新排列</div>
+      <div class="power-count">剩余 <b id="powerInfoCount">1</b> 次</div>
+      <div class="power-actions">
+        <button class="btn ghost" id="powerInfoCancel">取消</button>
+        <button class="btn power-use" id="powerInfoUse">使用</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 越线救场（v5.9）：超线不再直接结束，给一次道具救场机会 -->
   <div class="overlay" id="rescueOverlay">
     <div class="modal">
@@ -591,7 +870,7 @@
   const SB_HEADERS = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
   const NICK_KEY = 'animalBathNick';   // localStorage：昵称
   const SAVE_KEY = 'animalBathSave';   // localStorage：本局存档（续玩）
-const VER = 'v5.9.18';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
+const VER = 'v6.0';   // v4.9.12: 存档版本标记（v5.9.11 起改宽容读档：仅结构损坏或低于 COMPAT_VER=v5.9 的档作废，其余版本旧档保留续玩）；v4.10.0: 新增道具字段（整理/撤回），旧档作废；v4.10.1: 道具布局/整理交互改动，旧档作废；v4.10.2: 悬停框整列/黄色闪亮框/道具悬浮布局，旧档作废；v4.10.3: 悬停框 3×3 矩形/框选贴齐格子/下落中按钮点击拦截（不闪），旧档作废；v4.10.4: 整理范围限定框选列（修整理超范围bug），旧档作废；v4.10.5: 固定 3×3 选择框（框大小恒定跟随）+ 弹出字低饱和/泡泡装饰/emoji 兼容，旧档作废；v4.10.6: 整理后禁撤回（reorgUsed 进存档，旧档缺字段默认 false 兼容，不强制作废）+ 结算后开新局强制刷新；v5.0: 首个正式大版本；v5.1: 整理确认制+取消按钮+整理后禁撤回+结算开新局强制刷新+掉落让位前先配对，旧档作废；v5.2: 掉落后期保底 + 整理框选定住 + 整理后撤回保留，旧档作废；v5.3: 整理单击即确认+确认后吞 click 防误投，旧档作废；v5.4: 埋点上报事件（页面/开局/结束/道具/看榜），存档结构未变但按惯例升 VER，旧档作废；v5.5: 新增 login 埋点（名片确认即计）+ 看板今日进来/最近游玩修正（events 口径），存档结构未变，旧档作废；v5.6: 起名查重移除，存档结构未变，旧档作废；v5.7: 新设备重名软提醒，存档结构未变，旧档作废；v5.8: 查重不阻塞+全请求8s超时，存档结构未变，旧档作废；v5.9: 锤子道具进存档（hammerLeft，缺字段读档回默认 1）+ 超线救场不续玩，存档结构微变按惯例升 VER，旧档作废；v5.9.5: 道具按钮改方块图标（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.6: 修复按钮文字 bug（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.7: 道具角标黄+图标左移（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.8: 角标完全进按钮内不再悬空（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.9: 角标单数字+emoji 居中放大（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.10: 角标改正圆（纯 UI，存档结构未变但按惯例升 VER，旧档作废）；v5.9.11: 读档放宽（结构+版本下限双重校验，v5.9+ 旧档保留续玩），存档结构未变
 
   // 动物表：1-40 级（渐变：顶部亮 → 底部深，配合左上高光更有立体感）
   // 40 级以后自动回退 🐾+数字（几乎不可能合到，纯防御）
@@ -789,6 +1068,12 @@ const EMOJI_IMGS = [
   const whoNameEl = document.getElementById('whoName');
   const rankOverlay = document.getElementById('rankOverlay');
   const updOverlay = document.getElementById('updOverlay');   // v4.9.3 更新说明
+  const powerInfoOverlay = document.getElementById('powerInfoOverlay');
+  const powerInfoEmoji = document.getElementById('powerInfoEmoji');
+  const powerInfoTitle = document.getElementById('powerInfoTitle');
+  const powerInfoDesc = document.getElementById('powerInfoDesc');
+  const powerInfoCount = document.getElementById('powerInfoCount');
+  const powerInfoUse = document.getElementById('powerInfoUse');
   const rankList = document.getElementById('rankList');
   const rankMine = document.getElementById('rankMine');
   const rankLoading = document.getElementById('rankLoading');
@@ -2225,8 +2510,34 @@ const EMOJI_IMGS = [
     drop(parseInt(e.key, 10) - 1);
   });
 
+  // 道具说明卡：首次点击只解释，确认后复用原有道具入口。
+  const POWER_INFO = {
+    reorg: { emoji: '🧹', title: '整理', desc: '选一个 3×3 区域，把里面的棋子从左到右、从大到小重新排列', left: () => reorgLeft },
+    undo: { emoji: '↩', title: '撤回', desc: '撤销上一步操作', left: () => undoLeft },
+    hammer: { emoji: '🔨', title: '锤子', desc: '砸掉一格棋子，上方棋子自然下落（砸掉后不可撤回）', left: () => hammerLeft }
+  };
+  let pendingPower = null;
+
+  function closePowerInfo(){
+    powerInfoOverlay.classList.remove('show');
+    pendingPower = null;
+  }
+
+  function showPowerInfo(type){
+    const info = POWER_INFO[type];
+    if (!info) return;
+    pendingPower = type;
+    powerInfoEmoji.textContent = info.emoji;
+    powerInfoTitle.textContent = info.title;
+    powerInfoDesc.textContent = info.desc;
+    powerInfoCount.textContent = info.left();
+    powerInfoOverlay.classList.add('show');
+    try { powerInfoUse.focus({ preventScroll: true }); } catch (e) { powerInfoUse.focus(); }
+  }
+
   // ===== 更新说明（v4.9.3）：时间倒序，最新在上 =====
   const VERSIONS = [
+    ['v6.0', '2026-08-26', '界面焕新：清透浴水配色更清爽；道具新增说明卡，用前先看说明'],
     ['v5.9.18', '2026-08-26', '修复越线救场：救场时可能卡死、按键盘还会误落子，现在都修好了'],
     ['v5.9.17', '2026-08-25', '修复锤子：砸掉棋子上方落下来、和旁边的相同数字挨着时，现在会自动合成了'],
     ['v5.9.16', '2026-08-24', '更新埋点系统'],
@@ -2316,7 +2627,7 @@ const EMOJI_IMGS = [
   window.addEventListener('resize', fitBoard);
 
   // v4.10.0: 道具按钮
-  undoBtn.addEventListener('click', doUndo);
+  undoBtn.addEventListener('click', () => showPowerInfo('undo'));
   reorgBtn.addEventListener('click', () => {
     if (reorgMode){
       // v4.10.6: 整理模式中再点 = 确认整理（不再取消）——用当前框位置，没选过则默认棋盘中心 3×3
@@ -2325,8 +2636,7 @@ const EMOJI_IMGS = [
       return;
     }
     if (reorgLeft <= 0 || busy || !running) return;
-    if (hammerMode) setHammerMode(false);   // v5.9: 与锤子互斥
-    setReorgMode(true);
+    showPowerInfo('reorg');
   });
   reorgCancelBtn.addEventListener('click', () => { setReorgMode(false); });   // v4.10.6: 取消整理（不生效）
   // v5.9: 锤子按钮——进入模式（🔨 锤子）→ 再点 = 确认砸（用当前框位置，没选过则默认棋盘中心 1×1）
@@ -2338,10 +2648,30 @@ const EMOJI_IMGS = [
       return;
     }
     if (hammerLeft <= 0 || busy || !running) return;
-    if (reorgMode) setReorgMode(false);   // v5.9: 与整理互斥
-    setHammerMode(true);
+    showPowerInfo('hammer');
   });
   hammerCancelBtn.addEventListener('click', () => { setHammerMode(false); });   // v5.9: 取消锤子（不生效）
+  document.getElementById('powerInfoCancel').addEventListener('click', closePowerInfo);
+  powerInfoOverlay.addEventListener('click', (e) => { if (e.target === powerInfoOverlay) closePowerInfo(); });
+  powerInfoUse.addEventListener('click', () => {
+    const type = pendingPower;
+    closePowerInfo();
+    if (type === 'undo') { doUndo(); return; }
+    if (type === 'reorg') {
+      if (reorgLeft <= 0 || busy || !running) return;
+      if (hammerMode) setHammerMode(false);
+      setReorgMode(true);
+      return;
+    }
+    if (type === 'hammer') {
+      if (hammerLeft <= 0 || busy || !running) return;
+      if (reorgMode) setReorgMode(false);
+      setHammerMode(true);
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && powerInfoOverlay.classList.contains('show')) closePowerInfo();
+  });
   // v5.9: 越线救场弹窗——使用道具救场 / 放弃结束
   document.getElementById('rescueGo').addEventListener('click', () => {
     rescueOverlay.classList.remove('show');
@@ -2455,6 +2785,7 @@ const EMOJI_IMGS = [
     };
   }
 
+  fitBoard();          // 登录前尚未 init：先按正常手机几何收窄背景棋盘，避免默认块级宽度铺满
   showNameOverlay();   // 启动：先登录昵称（有存档可继续上一局）
   flushPending();   // v5.9.16: 补报上次关闭时没发出去的埋点（弱网保底）
   trackEvent('page_view', { ua: (navigator.userAgent || '').slice(0, 120) });   // v5.4: 页面访问埋点（放最后确保 DOM 就绪）
