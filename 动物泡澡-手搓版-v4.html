@@ -109,7 +109,8 @@
   .board-wrap { flex: 1; padding: 6px 12px 10px; position: relative; }
   /* 棋盘（泡泡浴缸底） */
   .board {
-    position: relative; height: 100%;
+    /* 首帧即按 byWidth 几何收窄：availW - 58px ≈ 5 列 + 4 个 2px 间距 + 8px 内边距。 */
+    position: relative; width: calc(100% - 58px); height: 100%; margin: 0 auto;
     background:
       radial-gradient(circle at 12% 18%, rgba(255,255,255,.55) 0 5px, transparent 6.5px),
       radial-gradient(circle at 78% 10%, rgba(255,255,255,.45) 0 4px, transparent 5.5px),
@@ -1147,7 +1148,7 @@ const EMOJI_IMGS = [
     const boardH = board.clientHeight;
     // v4.9.8: 可用宽度从父容器取（.board-wrap padding 12px*2）——本函数会给 board 设显式收窄宽度，读 board 自身会反馈收缩
     const availW = board.parentElement.clientWidth - 24;
-    if (!boardH || !availW) return;
+    if (!availW) return;
     const gap = 2;
     // v5.9.12: 右侧道具按钮列预留空间（按钮 40px + 右缘 2px + 间隙 8px + 余量 6px）——
     // 手机高视口下 byHeight 很大、byWidth 主导会把棋盘撑满屏宽（360×800 实测 tile 63、棋盘 325px 占 90% 屏宽），
@@ -1158,7 +1159,7 @@ const EMOJI_IMGS = [
     // 大屏不再出现警戒线上移/行数变多（电脑、手机一致 6 行）；矮屏自动缩小方块保证 6 行放得下
     const byWidth = Math.max(34, Math.floor((availW - 10 - (COLS - 1) * gap - POWER_RESERVE) / COLS));   // v4.9.3: 列收缩居中布局，净列距=gap
     // v4.9.2: 高度预算按 7 行算（线下 6 行堆叠 + 线上 1 行投放缓冲）——警戒线上方始终留出一行空间
-    const byHeight = Math.max(24, Math.floor((boardH - 14 - ROWS * gap) / (ROWS + 1)));
+    const byHeight = boardH ? Math.max(24, Math.floor((boardH - 14 - ROWS * gap) / (ROWS + 1))) : Infinity;
     const tile = Math.min(byWidth, byHeight);
     rootStyle.setProperty('--tile', tile + 'px');
     rootStyle.setProperty('--gap', gap + 'px');
@@ -1168,9 +1169,11 @@ const EMOJI_IMGS = [
     board.style.margin = '0 auto';
     curTile = tile; curGap = gap;
     // 警戒线 = 第 6 行顶部（堆满 6 层顶部贴线=触碰，不死；第 7 层越线=结束）
-    const top = Math.max(6, boardH - 7 - ROWS * (tile + gap));
-    dangerLine.style.top = top + 'px';
-    dangerTag.style.top = (top - 12) + 'px';
+    if (boardH){
+      const top = Math.max(6, boardH - 7 - ROWS * (tile + gap));
+      dangerLine.style.top = top + 'px';
+      dangerTag.style.top = (top - 12) + 'px';
+    }
   }
 
   // ===== 特效 =====
@@ -2385,16 +2388,9 @@ const EMOJI_IMGS = [
         if (state && nameOverlay.classList.contains('show')) nameContinue.style.display = 'block';
       });
     }
+    // 弹窗出现前同步收窄；高度尚未就绪时 fitBoard 仍可用 byWidth 算出手机端正确宽度。
+    fitBoard();
     nameOverlay.classList.add('show');
-    // 登录页背景棋盘收窄：等 board 高度布局完成再 fitBoard。
-    // iOS 首帧 100dvh 可能晚于双 rAF 落定，boardH=0 时 fitBoard 会提前 return 导致棋盘撑满屏宽；
-    // 改为轮询等待 board.clientHeight>0（最多 60 帧≈1s），确保登录页棋盘一定被收窄。
-    let _fitTries = 0;
-    const _ensureFit = () => {
-      if (board.clientHeight > 0 || ++_fitTries > 60) { fitBoard(); return; }
-      requestAnimationFrame(_ensureFit);
-    };
-    requestAnimationFrame(_ensureFit);
     setTimeout(() => { try { nameInput.focus(); } catch (e) {} }, 150);
   }
 
