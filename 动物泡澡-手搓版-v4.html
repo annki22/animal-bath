@@ -55,11 +55,6 @@
     position: relative; overflow: hidden;
   }
 
-  /* 手机端从 Safari 提供的安全布局视口顶部排版，避免地址栏切换后内容顶进状态栏。 */
-  @media (max-width: 600px) {
-    body { align-items: flex-start; }
-  }
-
   /* ===== 顶部 ===== */
   .topbar {
     display: flex; align-items: flex-start; justify-content: space-between;
@@ -2391,8 +2386,15 @@ const EMOJI_IMGS = [
       });
     }
     nameOverlay.classList.add('show');
-    // iOS 首帧 flex 高度可能尚未落定；遮罩显示后等两帧再收窄背景棋盘。
-    requestAnimationFrame(() => requestAnimationFrame(fitBoard));
+    // 登录页背景棋盘收窄：等 board 高度布局完成再 fitBoard。
+    // iOS 首帧 100dvh 可能晚于双 rAF 落定，boardH=0 时 fitBoard 会提前 return 导致棋盘撑满屏宽；
+    // 改为轮询等待 board.clientHeight>0（最多 60 帧≈1s），确保登录页棋盘一定被收窄。
+    let _fitTries = 0;
+    const _ensureFit = () => {
+      if (board.clientHeight > 0 || ++_fitTries > 60) { fitBoard(); return; }
+      requestAnimationFrame(_ensureFit);
+    };
+    requestAnimationFrame(_ensureFit);
     setTimeout(() => { try { nameInput.focus(); } catch (e) {} }, 150);
   }
 
