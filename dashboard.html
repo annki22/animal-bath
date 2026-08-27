@@ -51,6 +51,11 @@
   tr:last-child td{border-bottom:none}
   .rank{color:var(--sub);font-weight:600}
 
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:#F5F5F7;border-radius:999px;padding:6px 13px;font-size:13px;font-weight:500;color:var(--ink);line-height:1.4}
+  .chip .n{color:var(--sub);font-size:11px;margin-left:6px;font-weight:500}
+  .empty{font-size:13px;color:var(--sub)}
+
   .hint{font-size:11px;color:var(--sub);line-height:1.7;margin-top:14px}
   .hint b{color:var(--ink);font-weight:600}
 
@@ -94,6 +99,11 @@
 
   <div id="content" style="display:none">
     <section class="kpis" id="kpis"></section>
+
+    <div class="card">
+      <h3>今日活跃玩家<small id="todayActiveCount">—</small></h3>
+      <div class="chips" id="todayActiveChips"></div>
+    </div>
 
     <div class="card">
       <h3>近 14 天活跃与局数<small>按昵称去重 · 上海时区</small></h3>
@@ -299,7 +309,7 @@
     // 今日进来（login 去重昵称，含没打完的；RPC 旧版无 loginPlayers 字段时显示 —）
     const todayStr = localDay(new Date());
     const todayRow = (agg.byDay || []).find(r => r.day === todayStr);
-    const loginToday = todayRow ? (todayRow.loginPlayers == null ? null : todayRow.loginPlayers) : null;
+    const loginToday = todayRow ? ((todayRow.loginPlayers ?? todayRow.loginplayers) ?? null) : null;
 
     const kpis = [
       { label: '今日进来', num: loginToday == null ? '—' : loginToday, extra: '输入昵称即计，含未打完' },
@@ -349,6 +359,7 @@
       const gamesByDay = {};  // day -> count
       const firstDay = {};    // nick -> earliest score day
       const nickBest = {};    // nick -> {score, max_level, games, last}
+      const gamesTodayNick = {}; // nick -> 今天结算局数
       const allDays = new Set();
 
       const touch = (d, nick) => {
@@ -359,13 +370,14 @@
 
       for (const s of scores) {
         touch(s.created_at, s.nickname);
-        gamesByDay[localDay(new Date(s.created_at))] = (gamesByDay[localDay(new Date(s.created_at))] || 0) + 1;
-        if (!(s.nickname in firstDay)) firstDay[s.nickname] = localDay(new Date(s.created_at));
+        const sd = localDay(new Date(s.created_at));
+        gamesByDay[sd] = (gamesByDay[sd] || 0) + 1;
+        if (sd === today) gamesTodayNick[s.nickname] = (gamesTodayNick[s.nickname] || 0) + 1;
+        if (!(s.nickname in firstDay)) firstDay[s.nickname] = sd;
         const b = nickBest[s.nickname] = nickBest[s.nickname] || { score: 0, max_level: 0, games: 0, last: '' };
         b.games++;
         if (s.score > b.score) b.score = s.score;
         if (s.max_level > b.max_level) b.max_level = s.max_level;
-        const sd = localDay(new Date(s.created_at));
         if (sd > b.last) b.last = sd;
       }
       for (const s of saves) touch(s.updated_at, s.nickname);
@@ -392,6 +404,22 @@
       $('kpis').innerHTML = kpis.map(k =>
         `<div class="kpi"><div class="label">${k.label}</div><div class="num">${k.num}</div><div class="extra">${k.extra}</div></div>`
       ).join('');
+
+      // ---------- 今日活跃玩家列表 ----------
+      const todayActives = [...(activeSet[today] || [])].sort((a, b) => {
+        const sa = nickBest[a] ? nickBest[a].score : -1;
+        const sb = nickBest[b] ? nickBest[b].score : -1;
+        if (sa !== sb) return sb - sa;
+        return a.localeCompare(b, 'zh-Hans-CN');
+      });
+      $('todayActiveCount').textContent = todayActives.length + ' 人';
+      $('todayActiveChips').innerHTML = todayActives.length
+        ? todayActives.map(n => {
+            const g = gamesTodayNick[n] || 0;
+            const gtxt = g > 0 ? `<span class="n">${g} 局</span>` : '';
+            return `<span class="chip">${escapeHtml(n)}${gtxt}</span>`;
+          }).join('')
+        : '<span class="empty">今天还没有玩家活跃</span>';
 
       // ---------- 趋势（近14天） ----------
       drawTrend(activeSet, gamesByDay, 14);
