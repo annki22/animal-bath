@@ -343,9 +343,10 @@
 
   async function main() {
     try {
-      const [scores, saves] = await Promise.all([
+      const [scores, saves, agg] = await Promise.all([
         fetchAll('scores', 'nickname,score,max_level,created_at', 'created_at'),
-        fetchAll('saves', 'nickname,updated_at', 'updated_at')
+        fetchAll('saves', 'nickname,updated_at', 'updated_at'),
+        fetchEventsAgg().catch(() => null)
       ]);
       $('state').style.display = 'none';
       $('content').style.display = 'block';
@@ -354,6 +355,12 @@
       // ---------- 聚合 ----------
       const today = localDay(new Date());
       const yesterday = localDay(daysAgo(1));
+      const todayLogin = new Set();
+      if (agg && agg.players) {
+        for (const [nick, day] of Object.entries(agg.players)) {
+          if (day === today) todayLogin.add(nick);
+        }
+      }
 
       const activeSet = {};   // day -> Set(nick)
       const gamesByDay = {};  // day -> count
@@ -384,6 +391,7 @@
 
       const act = k => (activeSet[k] || new Set()).size;
       const games = k => gamesByDay[k] || 0;
+      const todayActiveSet = new Set([...(activeSet[today] || []), ...todayLogin]);
 
       // ---------- KPI ----------
       const weekActive = new Set();
@@ -395,7 +403,7 @@
       const maxScore = Math.max(...allScores);
 
       const kpis = [
-        { label: '今日活跃', num: act(today), extra: '昨日 ' + act(yesterday) },
+        { label: '今日活跃', num: todayActiveSet.size, extra: '昨日 ' + act(yesterday) },
         { label: '近 7 日活跃', num: weekActive.size, extra: '去重玩家' },
         { label: '累计玩家', num: allActive.size, extra: '今日新增 ' + newToday },
         { label: '累计局数', num: scores.length, extra: '平均 ' + avgScore + ' 分' },
@@ -406,7 +414,7 @@
       ).join('');
 
       // ---------- 今日活跃玩家列表 ----------
-      const todayActives = [...(activeSet[today] || [])].sort((a, b) => {
+      const todayActives = [...todayActiveSet].sort((a, b) => {
         const sa = nickBest[a] ? nickBest[a].score : -1;
         const sb = nickBest[b] ? nickBest[b].score : -1;
         if (sa !== sb) return sb - sa;
@@ -416,7 +424,7 @@
       $('todayActiveChips').innerHTML = todayActives.length
         ? todayActives.map(n => {
             const g = gamesTodayNick[n] || 0;
-            const gtxt = g > 0 ? `<span class="n">${g} 局</span>` : '';
+            const gtxt = `<span class="n">${g} 局</span>`;
             return `<span class="chip">${escapeHtml(n)}${gtxt}</span>`;
           }).join('')
         : '<span class="empty">今天还没有玩家活跃</span>';
@@ -436,8 +444,6 @@
       drawBars(lv, Array.from({ length: lvMax }, (_, i) => String(i + 1)), $('chartLevel'), 'bar2');
 
       // ---------- 最近游玩修正（v5.5：RPC players = 最近活动日，覆盖 scores 首次上榜结算日） ----------
-      let agg = null;
-      try { agg = await fetchEventsAgg(); } catch (e) { agg = null; }
       if (agg && agg.players) {
         for (const [nick, day] of Object.entries(agg.players)) {
           const b = nickBest[nick];
@@ -465,7 +471,6 @@
 
       // ---------- 埋点洞察（独立容错，RPC 未建/失败不影响主看板） ----------
       try {
-        if (!agg) agg = await fetchEventsAgg();
         renderEvents(agg);
       } catch (err) {
         $('eventsCard').style.display = 'block';
